@@ -1,0 +1,69 @@
+import pygame
+from Personagens import Protagonista
+from plano_de_fundo import carregar_camadas, desenhar_parallax
+
+pygame.init()
+
+# --- Configurações da tela ---
+SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Personagem centralizado com pulo (sem chão)")
+clock = pygame.time.Clock()
+FPS = 60
+
+# --- Fundo ---
+camadas_fundo = carregar_camadas(SCREEN_HEIGHT)
+camera_x = 0.0
+
+# --- Altura do chão visual (personagem pisa sobre o cenário) ---
+CHAO_Y = 550   
+
+# --- Player ---
+player = Protagonista(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150, scale=3,
+                      idle_count=4, run_count=6, jump_count=4, double_count=6)
+
+player_group = pygame.sprite.Group(player)
+
+# --- Loop principal ---
+rodando = True
+while rodando:
+    dt = clock.tick(FPS) / 1000.0  # segundos desde o último frame
+
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            rodando = False
+
+    # definindo o pulo
+        elif event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_UP:
+                player.jump()
+
+    #  Movimento horizontal
+    keys = pygame.key.get_pressed()
+    dx = 0
+    if keys[pygame.K_LEFT]:
+        dx = -player.speed
+    if keys[pygame.K_RIGHT]:
+        dx = player.speed
+    
+    #Atualiza câmera e direção 
+    if dx != 0:
+        camera_x += dx
+        player.facing = "right" if dx > 0 else "left"
+
+    #Gravidade e animação
+    player.aplicar_gravidade(CHAO_Y)
+    player.update(dt, moving=(dx != 0))
+
+    # Mantém o personagem no centro
+    player.rect.centerx = SCREEN_WIDTH // 2
+    
+
+    #Desenha fundo e personagem
+    desenhar_parallax(screen, camadas_fundo, camera_x, SCREEN_WIDTH)
+    screen.blit(player.image, player.rect)
+
+    pygame.display.flip()
+    screen.fill((0, 0, 0))
+
+pygame.quit()

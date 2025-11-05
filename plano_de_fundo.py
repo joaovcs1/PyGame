@@ -1,13 +1,9 @@
 import pygame
 import os
+from assets import *
 
 def carregar_camadas(screen_height):
-    #carregar imagens
-    caminhos = [
-        ("assets/Imagens/Imagens de fundo/back.png", 0.2),
-        ("assets/Imagens/Imagens de fundo/middle.png", 0.4),
-        ("assets/Imagens/Imagens de fundo/foreground.png", 1.0)
-    ]
+   
     camadas = []
     for caminho, fator in caminhos:
         caminho = os.path.normpath(caminho)

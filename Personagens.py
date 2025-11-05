@@ -1,19 +1,13 @@
 # Personagens.py
 import pygame
 import os
+from assets import*
 
 class Protagonista(pygame.sprite.Sprite):
     def __init__(self, x, y, scale=3,
                  idle_count=4, run_count=6, jump_count=4, double_count=6):
         super().__init__()
         self.scale = int(scale) if scale >= 1 else 1
-
-        base = os.path.normpath("assets/Imagens/3 Cyborg")
-
-        idle_path = os.path.join(base, "Cyborg_idle.png")
-        run_path = os.path.join(base, "Cyborg_run.png")
-        jump_path = os.path.join(base, "Cyborg_jump.png")
-        double_path = os.path.join(base, "Cyborg_doublejump.png")
 
         self.idle_frames = self._load_frames(idle_path, idle_count, self.scale)
         self.run_frames = self._load_frames(run_path, run_count, self.scale)
@@ -96,7 +90,7 @@ class Protagonista(pygame.sprite.Sprite):
                 self.can_double_jump = False
                 self.used_double = True
 
-    #fisica do pulo
+    #fisica do
     def aplicar_gravidade(self, chao_y):
         self.vel_y += self.gravidade
         self.rect.y += int(self.vel_y)

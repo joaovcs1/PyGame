@@ -4,10 +4,10 @@ import os
 from assets import*
 
 class Protagonista(pygame.sprite.Sprite):
-    def __init__(self, x, y, scale=3,
-                 idle_count=4, run_count=6, jump_count=4, double_count=6):
+    def __init__(self, x, y, scale=1.5,
+                 idle_count=6, run_count=10, jump_count=10, double_count=6):
         super().__init__()
-        self.scale = int(scale) if scale >= 1 else 1
+        self.scale = float(scale) if scale >= 0.5 else 0.5
 
         self.idle_frames = self._load_frames(idle_path, idle_count, self.scale)
         self.run_frames = self._load_frames(run_path, run_count, self.scale)
@@ -43,6 +43,27 @@ class Protagonista(pygame.sprite.Sprite):
         s.fill((200,80,40))
         return s
 
+    def _apply_glow(self, frame, color=(255, 245, 200), radius=2, alpha=120):
+        """Aplica um brilho constante ao redor do frame usando máscara."""
+        if radius <= 0 or alpha <= 0:
+            return frame
+        mask = pygame.mask.from_surface(frame)
+        if mask.count() == 0:
+            return frame
+        mask_surf = mask.to_surface(setcolor=(color[0], color[1], color[2], 255), unsetcolor=(0, 0, 0, 0))
+        glow_w = frame.get_width() + radius * 2
+        glow_h = frame.get_height() + radius * 2
+        glow = pygame.Surface((glow_w, glow_h), pygame.SRCALPHA)
+        for dx in range(-radius, radius + 1):
+            for dy in range(-radius, radius + 1):
+                if dx*dx + dy*dy <= radius*radius:
+                    glow.blit(mask_surf, (dx + radius, dy + radius))
+        glow.set_alpha(alpha)
+        composed = pygame.Surface((glow_w, glow_h), pygame.SRCALPHA)
+        composed.blit(glow, (0, 0))
+        composed.blit(frame, (radius, radius))
+        return composed
+
     def _load_frames(self, caminho, num_frames, scale):
         caminho = os.path.normpath(caminho)
         try:
@@ -60,11 +81,10 @@ class Protagonista(pygame.sprite.Sprite):
         for i in range(num_frames):
             rect = pygame.Rect(i * frame_w, 0, frame_w, sheet_h)
             frame = sheet.subsurface(rect).copy()
-            # escala inteira (preserva pixel-art)
-            int_scale = int(scale) if scale >= 1 else 1
-            new_w = frame.get_width() * int_scale
-            new_h = frame.get_height() * int_scale
-            frame = pygame.transform.scale(frame, (new_w, new_h))
+            # redimensiona usando escala fracionária
+            new_w = max(1, int(round(frame.get_width() * self.scale)))
+            new_h = max(1, int(round(frame.get_height() * self.scale)))
+            frame = pygame.transform.smoothscale(frame, (new_w, new_h))
             frames.append(frame)
         return frames
 

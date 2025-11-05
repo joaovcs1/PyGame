@@ -1,11 +1,12 @@
 import os
 
 #imagens de personagens
-base = os.path.normpath("assets/Imagens/3 Cyborg")
-idle_path = os.path.join(base, "Cyborg_idle.png")
-run_path = os.path.join(base, "Cyborg_run.png")
-jump_path = os.path.join(base, "Cyborg_jump.png")
-double_path = os.path.join(base, "Cyborg_doublejump.png")
+base = os.path.normpath("assets/Imagens/Shelby")
+idle_path = os.path.join(base, "shelby_idle.png")
+run_path = os.path.join(base, "shelby_run.png")
+jump_path = os.path.join(base, "shelby_jump.png")
+# reutiliza o sheet de jump para o double jump
+double_path = jump_path
 
 #imagens do plano de fundo
 caminhos = [

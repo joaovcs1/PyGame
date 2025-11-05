@@ -19,8 +19,8 @@ camera_x = 0.0
 CHAO_Y = 550   
 
 # --- Player ---
-player = Protagonista(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150, scale=3,
-                      idle_count=4, run_count=6, jump_count=4, double_count=6)
+player = Protagonista(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150, scale=1.5,
+                      idle_count=6, run_count=10, jump_count=10, double_count=10)
 
 player_group = pygame.sprite.Group(player)
 

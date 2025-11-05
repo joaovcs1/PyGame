@@ -84,7 +84,7 @@ class Protagonista(pygame.sprite.Sprite):
             # redimensiona usando escala fracionária
             new_w = max(1, int(round(frame.get_width() * self.scale)))
             new_h = max(1, int(round(frame.get_height() * self.scale)))
-            frame = pygame.transform.smoothscale(frame, (new_w, new_h))
+            frame = pygame.transform.scale(frame, (new_w, new_h))
             frames.append(frame)
         return frames
 

@@ -8,6 +8,10 @@ jump_path = os.path.join(base, "shelby_jump.png")
 # reutiliza o sheet de jump para o double jump
 double_path = jump_path
 
+# disparo e projétil
+shot_path = os.path.join(base, "shelby_shot.png")
+bullet_path = os.path.join(base, "projetil_shelby.png")
+
 #imagens do plano de fundo
 caminhos = [
         ("assets/Imagens/Imagens de fundo/back.png", 0.2),

@@ -23,6 +23,7 @@ player = Protagonista(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150, scale=1.5,
                       idle_count=6, run_count=10, jump_count=10, double_count=10)
 
 player_group = pygame.sprite.Group(player)
+bullets = pygame.sprite.Group()
 
 # --- Loop principal ---
 rodando = True
@@ -36,7 +37,11 @@ while rodando:
     # definindo o pulo
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
-                   player.jump()
+                player.jump()
+            elif event.key == pygame.K_SPACE:
+                proj = player.shoot()
+                if proj:
+                    bullets.add(proj)
 
     #  Movimento horizontal
     keys = pygame.key.get_pressed()
@@ -55,6 +60,7 @@ while rodando:
     #Gravidade e animação
     player.aplicar_gravidade(CHAO_Y)
     player.update(dt, moving=(dx != 0))
+    bullets.update(dt)
 
     # Mantém o personagem no centro
     player.rect.centerx = SCREEN_WIDTH // 2
@@ -63,6 +69,7 @@ while rodando:
     #Desenha fundo e personagem
     desenhar_parallax(screen, camadas_fundo, camera_x, SCREEN_WIDTH)
     screen.blit(player.image, player.rect)
+    bullets.draw(screen)
 
     pygame.display.flip()
     screen.fill((0, 0, 0))

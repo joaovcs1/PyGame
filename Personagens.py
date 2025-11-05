@@ -13,12 +13,16 @@ class Protagonista(pygame.sprite.Sprite):
         self.run_frames = self._load_frames(run_path, run_count, self.scale)
         self.jump_frames = self._load_frames(jump_path, jump_count, self.scale)
         self.double_frames = self._load_frames(double_path, double_count, self.scale)
+        # animação de tiro (4 frames por padrão)
+        self.shot_frames = self._load_frames(shot_path, 4, self.scale)
 
         # estado de animação
         self.current_frames = self.idle_frames if self.idle_frames else [self._fallback_surface(self.scale)]
         self.frame_index = 0
         self.animation_timer = 0.0
         self.animation_speed = 0.12
+        self.shot_timer = 0.0
+        self.shot_duration = 0.20  # segundos
 
         self.image = self.current_frames[self.frame_index]
         self.rect = self.image.get_rect(center=(x, y))
@@ -43,26 +47,6 @@ class Protagonista(pygame.sprite.Sprite):
         s.fill((200,80,40))
         return s
 
-    def _apply_glow(self, frame, color=(255, 245, 200), radius=2, alpha=120):
-        """Aplica um brilho constante ao redor do frame usando máscara."""
-        if radius <= 0 or alpha <= 0:
-            return frame
-        mask = pygame.mask.from_surface(frame)
-        if mask.count() == 0:
-            return frame
-        mask_surf = mask.to_surface(setcolor=(color[0], color[1], color[2], 255), unsetcolor=(0, 0, 0, 0))
-        glow_w = frame.get_width() + radius * 2
-        glow_h = frame.get_height() + radius * 2
-        glow = pygame.Surface((glow_w, glow_h), pygame.SRCALPHA)
-        for dx in range(-radius, radius + 1):
-            for dy in range(-radius, radius + 1):
-                if dx*dx + dy*dy <= radius*radius:
-                    glow.blit(mask_surf, (dx + radius, dy + radius))
-        glow.set_alpha(alpha)
-        composed = pygame.Surface((glow_w, glow_h), pygame.SRCALPHA)
-        composed.blit(glow, (0, 0))
-        composed.blit(frame, (radius, radius))
-        return composed
 
     def _load_frames(self, caminho, num_frames, scale):
         caminho = os.path.normpath(caminho)
@@ -125,7 +109,11 @@ class Protagonista(pygame.sprite.Sprite):
 
     def update(self, dt, moving=False):
         # escolhe frames por estado (prioridade: ar -> run -> idle)
-        if not self.no_chao:
+        if self.shot_timer > 0:
+            self.shot_timer = max(0.0, self.shot_timer - dt)
+            frames = self.shot_frames if self.shot_frames else self.idle_frames
+            frame_time = max(0.06, self.animation_speed * 0.8)
+        elif not self.no_chao:
             frames = self.double_frames if (self.used_double and self.double_frames) else self.jump_frames
             frame_time = self.animation_speed
         else:
@@ -152,3 +140,39 @@ class Protagonista(pygame.sprite.Sprite):
             self.rect.centerx = prev_centerx
             self.rect.bottom = prev_bottom
  
+    def shoot(self):
+        """Dispara um projétil e aciona a animação de tiro. Retorna o sprite do projétil."""
+        self.shot_timer = self.shot_duration
+
+        # ponto de origem aproximado do cano da arma
+        img = self.image
+        if self.facing == "right":
+            muzzle_x = self.rect.centerx + img.get_width() // 8
+        else:
+            muzzle_x = self.rect.centerx - img.get_width() // 8
+        # altura do projétil acompanha a posição Y atual do personagem (arma fica aproximadamente no centery)
+        muzzle_y = (self.rect.centery - img.get_height() // 10)+53
+        direction = 1 if self.facing == "right" else -1
+        speed = 12
+        return Projetil(muzzle_x, muzzle_y, direction, speed, self.scale)
+
+
+class Projetil(pygame.sprite.Sprite):
+    def __init__(self, x, y, direction, speed, scale=1.0):
+        super().__init__()
+        try:
+            img = pygame.image.load(bullet_path).convert_alpha()
+        except Exception:
+            # fallback simples
+            img = pygame.Surface((6, 2), pygame.SRCALPHA)
+            img.fill((255, 200, 40))
+
+        new_w = max(1, int(round(img.get_width() * scale)))
+        new_h = max(1, int(round(img.get_height() * scale)))
+        self.image = pygame.transform.scale(img, (new_w, new_h))
+        self.rect = self.image.get_rect(center=(x, y))
+        self.direction = 1 if direction >= 0 else -1
+        self.speed = speed
+
+    def update(self, dt):
+        self.rect.x += int(self.direction * self.speed)

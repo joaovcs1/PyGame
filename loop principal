@@ -1,6 +1,8 @@
 import pygame
+import random
 from Personagens import Protagonista
 from plano_de_fundo import carregar_camadas, desenhar_parallax
+from Inimigos import Inimigo, InimigoCyborg, ProjetilInimigo, spawn_inimigo, spawn_inimigo_cyborg, spawn_inimigos_aleatorios
 
 pygame.init()
 
@@ -23,12 +25,27 @@ player = Protagonista(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150, scale=1.5,
                       idle_count=6, run_count=10, jump_count=10, double_count=10)
 
 player_group = pygame.sprite.Group(player)
-bullets = pygame.sprite.Group()
+bullets = pygame.sprite.Group()  # Projéteis do protagonista
+
+# --- Inimigos ---
+enemies = pygame.sprite.Group()
+enemy_bullets = pygame.sprite.Group()  # Projéteis dos inimigos
+
+# Timer para controlar quando os inimigos começam a aparecer
+game_start_timer = 0.0
+enemies_start_delay = 2.0  # Inimigos aparecem após 2 segundos
+
+# Controle de spawn
+spawn_timer = 0.0
+spawn_interval = 5.0  # Spawna um inimigo a cada 5 segundos
 
 # --- Loop principal ---
 rodando = True
 while rodando:
     dt = clock.tick(FPS) / 1000.0  # segundos desde o último frame
+    
+    # Atualiza timer do início do jogo
+    game_start_timer += dt
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
@@ -44,14 +61,17 @@ while rodando:
                     bullets.add(proj)
 
     #  Movimento horizontal
+    # Bloqueia movimento se o personagem estiver atirando
     keys = pygame.key.get_pressed()
     dx = 0
-    if keys[pygame.K_LEFT]:
-        dx = -player.speed
-    if keys[pygame.K_RIGHT]:
-        dx = player.speed
-    if keys[pygame.K_RIGHT] and keys[pygame.K_LEFT]:
-        dx=0
+    # Só permite movimento se não estiver atirando
+    if player.shot_timer <= 0:
+        if keys[pygame.K_LEFT]:
+            dx = -player.speed
+        if keys[pygame.K_RIGHT]:
+            dx = player.speed
+        if keys[pygame.K_RIGHT] and keys[pygame.K_LEFT]:
+            dx=0
     #Atualiza câmera e direção 
     if dx != 0:
         camera_x += dx
@@ -60,16 +80,134 @@ while rodando:
     #Gravidade e animação
     player.aplicar_gravidade(CHAO_Y)
     player.update(dt, moving=(dx != 0))
-    bullets.update(dt)
+    
+    # Posição do protagonista no mundo (para os inimigos mirarem)
+    player_world_x = camera_x + player.rect.centerx
+    player_world_y = player.rect.centery
 
     # Mantém o personagem no centro
     player.rect.centerx = SCREEN_WIDTH // 2
     
+    # --- Colisões de projéteis (ANTES de atualizar projéteis para evitar que atravessem) ---
+    # Projéteis do player acertam inimigos (corrigido para acertar apenas um inimigo por projétil)
+    # Remove o projétil IMEDIATAMENTE ao detectar colisão para evitar que atravesse o corpo do inimigo
+    # Só verifica colisões se já passaram 2 segundos
+    if game_start_timer >= enemies_start_delay:
+        for bullet in list(bullets):
+            # Verifica colisão manualmente com cada inimigo individualmente
+            hit_enemy = None
+            for enemy in list(enemies):
+                # Verifica se o inimigo está válido (vivo e não morrendo)
+                if not enemy.alive or enemy.is_dying:
+                    continue
+
+                # Calcula rect do inimigo em coordenadas de TELA (usa world_x menos camera_x)
+                # Isso garante precisão mesmo que enemy.rect ainda não tenha sido atualizado neste frame
+                enemy_rect_screen = enemy.rect.copy()
+                enemy_rect_screen.x = int(enemy.world_x - camera_x)
+
+                # Verifica colisão usando rect.colliderect para controle preciso
+                if bullet.rect.colliderect(enemy_rect_screen):
+                    # Encontrou colisão - marca o inimigo e para de verificar
+                    hit_enemy = enemy
+                    break
+            
+            # Se encontrou uma colisão, remove o projétil IMEDIATAMENTE
+            if hit_enemy:
+                # Remove o projétil antes de aplicar dano para evitar que atravesse
+                bullet.kill()
+                # Aplica dano apenas ao inimigo específico que foi acertado
+                hit_enemy.take_damage(1)
+    
+    # Agora atualiza os projéteis (após remover os que colidiram)
+    bullets.update(dt)
+    
+    # --- Sistema de Inimigos ---
+    # Só atualiza inimigos se já passaram 2 segundos
+    if game_start_timer >= enemies_start_delay:
+        # Atualiza inimigos
+        for enemy in enemies:
+            # Aplica gravidade mesmo quando morrendo (para cair naturalmente)
+            enemy.aplicar_gravidade(CHAO_Y)
+            enemy.update(dt, camera_x, (player_world_x, player_world_y))
+            
+            # Verifica o tipo de inimigo para aplicar comportamento correto
+            if isinstance(enemy, Inimigo):
+                # Inimigo normal atira no protagonista se estiver no alcance e não estiver morrendo
+                if enemy.alive and not enemy.is_dying and enemy.pode_atirar(player_world_x, player_world_y):
+                    proj = enemy.shoot(player_world_x, player_world_y)
+                    if proj:
+                        enemy_bullets.add(proj)
+            elif isinstance(enemy, InimigoCyborg):
+                # Cyborg soca quando perto (já é tratado no update, mas podemos adicionar colisão aqui)
+                if enemy.alive and not enemy.is_dying:
+                    # Verifica se o Cyborg está socando e colidindo com o player
+                    if enemy.punch_timer > 0:
+                        # Calcula distância para verificar se o soco acertou
+                        enemy_rect_screen = enemy.rect.copy()
+                        enemy_rect_screen.x = int(enemy.world_x - camera_x)
+                        
+                        # Verifica colisão corpo-a-corpo com o player
+                        if enemy_rect_screen.colliderect(player.rect):
+                            # Aqui você pode adicionar sistema de dano ao player
+                            # Por exemplo: player.take_damage(1)
+                            pass
+        
+        # Atualiza projéteis dos inimigos
+        enemy_bullets.update(dt)
+        
+        # Remove inimigos que saíram muito atrás ou à frente da câmera
+        # (mas não remove os que estão morrendo, para mostrar a animação)
+        for enemy in enemies:
+            if not enemy.is_dying:  # Só remove se não estiver morrendo
+                # Remove se saiu muito atrás da câmera
+                if enemy.world_x < camera_x - SCREEN_WIDTH:
+                    enemy.kill()
+                # Remove se saiu muito à frente da câmera (para evitar acúmulo)
+                elif enemy.world_x > camera_x + SCREEN_WIDTH * 2:
+                    enemy.kill()
+        
+        # Spawn de novos inimigos
+        spawn_timer += dt
+        if spawn_timer >= spawn_interval:
+            spawn_timer = 0.0
+            # Alterna entre spawnar pela direita e esquerda
+            lado = random.choice(["direita", "esquerda"])
+            # Alterna aleatoriamente entre inimigo normal e Cyborg
+            tipo_inimigo = random.choice(["normal", "cyborg"])
+            if tipo_inimigo == "cyborg":
+                novo_inimigo = spawn_inimigo_cyborg(camera_x, CHAO_Y, SCREEN_WIDTH, x_offset=SCREEN_WIDTH, lado=lado)
+            else:
+                novo_inimigo = spawn_inimigo(camera_x, CHAO_Y, SCREEN_WIDTH, x_offset=SCREEN_WIDTH, lado=lado)
+            enemies.add(novo_inimigo)
+        
+        # Projéteis dos inimigos acertam o player
+        player_hits = pygame.sprite.spritecollide(player, enemy_bullets, True)
+        if player_hits:
+            # Aqui você pode adicionar sistema de dano ao player
+            # Por exemplo: player.take_damage(1)
+            pass
+    
 
     #Desenha fundo e personagem
     desenhar_parallax(screen, camadas_fundo, camera_x, SCREEN_WIDTH)
+    
+    # Desenha inimigos (renderiza manualmente para garantir que todos apareçam)
+    # Só renderiza se já passaram 2 segundos
+    if game_start_timer >= enemies_start_delay:
+        for enemy in enemies:
+            # Verifica se o inimigo está dentro da área visível da tela
+            if -100 <= enemy.rect.x <= SCREEN_WIDTH + 100:  # Margem de 100px para renderizar fora da tela
+                screen.blit(enemy.image, enemy.rect)
+    
+    # Desenha protagonista
     screen.blit(player.image, player.rect)
-    bullets.draw(screen)
+    
+    # Desenha projéteis
+    bullets.draw(screen)  # Projéteis do protagonista
+    # Só desenha projéteis dos inimigos se já passaram 2 segundos
+    if game_start_timer >= enemies_start_delay:
+        enemy_bullets.draw(screen)  # Projéteis dos inimigos
 
     pygame.display.flip()
     screen.fill((0, 0, 0))

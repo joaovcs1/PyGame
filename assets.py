@@ -18,3 +18,17 @@ caminhos = [
         ("assets/Imagens/Imagens de fundo/middle.png", 0.4),
         ("assets/Imagens/Imagens de fundo/foreground.png", 1.0)
     ]
+
+#inimigo careca
+base_2 = os.path.normpath("assets/Imagens/inimigo1")
+idle_careca = os.path.join(base_2,"Idle_2.png")
+shot_careca = os.path.join(base_2,"Shot.png")
+run_careca = os.path.join(base_2,"Run.png")
+dead_careca = os.path.join(base_2,"Dead.png")
+
+#inimigo cyborg
+base_cyborg = os.path.normpath("assets/Imagens/3 Cyborg")
+cyborg_idle = os.path.join(base_cyborg, "Cyborg_idle.png")
+cyborg_run = os.path.join(base_cyborg, "Cyborg_run.png")
+cyborg_punch = os.path.join(base_cyborg, "Cyborg_punch.png")
+cyborg_death = os.path.join(base_cyborg, "Cyborg_death.png")

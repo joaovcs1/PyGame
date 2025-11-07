@@ -1,7 +1,7 @@
-# Personagens.py
 import pygame
 import os
-from assets import*
+from assets import *
+from collections import deque
 
 class Protagonista(pygame.sprite.Sprite):
     def __init__(self, x, y, scale=1.5,
@@ -13,26 +13,23 @@ class Protagonista(pygame.sprite.Sprite):
         self.run_frames = self._load_frames(run_path, run_count, self.scale)
         self.jump_frames = self._load_frames(jump_path, jump_count, self.scale)
         self.double_frames = self._load_frames(double_path, double_count, self.scale)
-        # animação de tiro (4 frames por padrão)
         self.shot_frames = self._load_frames(shot_path, 4, self.scale)
 
-        # estado de animação
         self.current_frames = self.idle_frames if self.idle_frames else [self._fallback_surface(self.scale)]
         self.frame_index = 0
         self.animation_timer = 0.0
         self.animation_speed = 0.12
         self.shot_timer = 0.0
-        self.shot_duration = 0.20  # segundos
+        self.shot_duration = 0.20
 
         self.image = self.current_frames[self.frame_index]
         self.rect = self.image.get_rect(center=(x, y))
+        self.y = float(self.rect.y)  # posição vertical em float (sub-pixel movement)
 
-        # movimento horizontal
         self.speed = 5
         self.facing = "right"
 
-        # física vertical (AJUSTAR AQUI PARA CONTROLAR ALTURA DO PULO)
-
+        # Física
         self.vel_y = 0.0
         self.gravidade = 0.45        
         self.jump_force = -10.0      
@@ -41,12 +38,10 @@ class Protagonista(pygame.sprite.Sprite):
         self.can_double_jump = True
         self.used_double = False
 
-
     def _fallback_surface(self, scale=1):
         s = pygame.Surface((32*scale, 48*scale), pygame.SRCALPHA)
         s.fill((200,80,40))
         return s
-
 
     def _load_frames(self, caminho, num_frames, scale):
         caminho = os.path.normpath(caminho)
@@ -65,7 +60,6 @@ class Protagonista(pygame.sprite.Sprite):
         for i in range(num_frames):
             rect = pygame.Rect(i * frame_w, 0, frame_w, sheet_h)
             frame = sheet.subsurface(rect).copy()
-            # redimensiona usando escala fracionária
             new_w = max(1, int(round(frame.get_width() * self.scale)))
             new_h = max(1, int(round(frame.get_height() * self.scale)))
             frame = pygame.transform.scale(frame, (new_w, new_h))
@@ -77,38 +71,64 @@ class Protagonista(pygame.sprite.Sprite):
             return
         self.facing = "right" if dx > 0 else "left"
         self.rect.x += int(dx)
+        self.y = float(self.rect.y)
 
     def jump(self):
-        # Primeiro pulo: se no chão, aplica jump_force.
-       # Double jump: se já no ar e can_double_jump True aplica double_jump_force
         if self.no_chao:
-            # primeiro pulo
             self.vel_y = self.jump_force
             self.no_chao = False
             self.can_double_jump = True
             self.used_double = False
         else:
-            # double jump (uma vez por sequência)
             if self.can_double_jump:
                 self.vel_y = self.double_jump_force
                 self.can_double_jump = False
                 self.used_double = True
 
-    #fisica do
-    def aplicar_gravidade(self, chao_y):
+    def aplicar_gravidade(self, chao_y, platforms=None):
+        """
+        Atualizado: mantém posição vertical em float (self.y) para subpixel movement.
+        Trata pouso em plataformas (iterável platforms) e pouso no chão (chao_y).
+        """
         self.vel_y += self.gravidade
-        self.rect.y += int(self.vel_y)
-        if self.rect.bottom >= chao_y:
-            self.rect.bottom = chao_y
+        prev_bottom = float(self.y + self.rect.height)
+        next_bottom = prev_bottom + float(self.vel_y)
+        landed_on_platform = None
+
+        if platforms and self.vel_y > 0:
+            for plat in platforms:
+                if not hasattr(plat, "rect"):
+                    continue
+                plat_rect = plat.rect
+                horiz_overlap = (self.rect.right > plat_rect.left + 2) and (self.rect.left < plat_rect.right - 2)
+                if not horiz_overlap:
+                    continue
+                plat_top = float(plat_rect.top)
+                if prev_bottom <= plat_top and next_bottom >= plat_top:
+                    landed_on_platform = plat
+                    break
+
+        if landed_on_platform:
+            self.y = float(landed_on_platform.rect.top - self.rect.height)
+            self.rect.y = int(self.y)
             self.vel_y = 0.0
             self.no_chao = True
             self.can_double_jump = True
             self.used_double = False
         else:
-            self.no_chao = False
+            self.y += self.vel_y
+            self.rect.y = int(self.y)
+            if self.rect.bottom >= chao_y:
+                self.rect.bottom = chao_y
+                self.y = float(self.rect.y)
+                self.vel_y = 0.0
+                self.no_chao = True
+                self.can_double_jump = True
+                self.used_double = False
+            else:
+                self.no_chao = False
 
     def update(self, dt, moving=False):
-        # escolhe frames por estado (prioridade: ar -> run -> idle)
         if self.shot_timer > 0:
             self.shot_timer = max(0.0, self.shot_timer - dt)
             frames = self.shot_frames if self.shot_frames else self.idle_frames
@@ -120,14 +140,12 @@ class Protagonista(pygame.sprite.Sprite):
             frames = self.run_frames if (moving and self.run_frames) else self.idle_frames
             frame_time = self.animation_speed
 
-        # animação por tempo
         self.animation_timer += dt
         if self.animation_timer >= frame_time:
             passos = int(self.animation_timer / frame_time)
             self.animation_timer -= passos * frame_time
             self.frame_index = (self.frame_index + passos) % len(frames)
 
-            # preserva posição vertical (bottom) e centerx ao trocar frame
             prev_centerx = self.rect.centerx
             prev_bottom = self.rect.bottom
 
@@ -139,18 +157,16 @@ class Protagonista(pygame.sprite.Sprite):
             self.rect = self.image.get_rect()
             self.rect.centerx = prev_centerx
             self.rect.bottom = prev_bottom
+            self.y = float(self.rect.y)
  
     def shoot(self):
         """Dispara um projétil e aciona a animação de tiro. Retorna o sprite do projétil."""
         self.shot_timer = self.shot_duration
-
-        # ponto de origem aproximado do cano da arma
         img = self.image
         if self.facing == "right":
             muzzle_x = self.rect.centerx + img.get_width() // 8
         else:
             muzzle_x = self.rect.centerx - img.get_width() // 8
-        # altura do projétil acompanha a posição Y atual do personagem (arma fica aproximadamente no centery)
         muzzle_y = (self.rect.centery - img.get_height() // 10)+53
         direction = 1 if self.facing == "right" else -1
         speed = 12
@@ -163,10 +179,8 @@ class Projetil(pygame.sprite.Sprite):
         try:
             img = pygame.image.load(bullet_path).convert_alpha()
         except Exception:
-            # fallback simples
             img = pygame.Surface((6, 2), pygame.SRCALPHA)
             img.fill((255, 200, 40))
-
         new_w = max(1, int(round(img.get_width() * scale)))
         new_h = max(1, int(round(img.get_height() * scale)))
         self.image = pygame.transform.scale(img, (new_w, new_h))
@@ -176,3 +190,48 @@ class Projetil(pygame.sprite.Sprite):
 
     def update(self, dt):
         self.rect.x += int(self.direction * self.speed)
+
+
+# --------------------------------------------------------------------
+# Plataformas (classes integradas ao final de Personagens.py)
+# --------------------------------------------------------------------
+class Platform(pygame.sprite.Sprite):
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((160, 30), pygame.SRCALPHA)
+        self.rect = self.image.get_rect()
+        self.active = False
+
+    def activate(self, screen_x, screen_y, width=180, height=30, color=(150,150,150)):
+        self.image = pygame.Surface((int(width), int(height)), pygame.SRCALPHA)
+        self.image.fill(color)
+        pygame.draw.rect(self.image, (100,100,100), self.image.get_rect(), 2)
+        self.rect = self.image.get_rect(topleft=(int(screen_x), int(screen_y)))
+        self.active = True
+
+    def deactivate(self):
+        self.active = False
+        self.rect.x = -99999
+
+    def update(self, camera_dx):
+        if not self.active:
+            return
+        self.rect.x -= int(camera_dx)
+        if self.rect.right < -200:
+            self.deactivate()
+
+
+class PlatformPool:
+    def __init__(self, pool_size=12):
+        self.pool = deque(Platform() for _ in range(pool_size))
+
+    def get(self):
+        for p in self.pool:
+            if not p.active:
+                return p
+        new_p = Platform()
+        self.pool.append(new_p)
+        return new_p
+
+    def active_sprites(self):
+        return [p for p in self.pool if p.active]

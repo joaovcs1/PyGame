@@ -1,40 +1,49 @@
 import pygame
-from Personagens import Protagonista
-from plano_de_fundo import carregar_camadas, desenhar_parallax
+import random
+from Personagens import *
+from plano_de_fundo import *
+
 
 pygame.init()
 
 # --- Configurações da tela ---
 SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Personagem centralizado com pulo (sem chão)")
+pygame.display.set_caption("Jogo com plataformas (spawn dinâmico)")
 clock = pygame.time.Clock()
 FPS = 60
 
 # --- Fundo ---
 camadas_fundo = carregar_camadas(SCREEN_HEIGHT)
 camera_x = 0.0
+last_camera_x = camera_x
 
-# --- Altura do chão visual (personagem pisa sobre o cenário) ---
-CHAO_Y = 550   
+# --- Altura do chão visual (onde o jogador pisa no asfalto) ---
+CHAO_Y = 550
 
 # --- Player ---
 player = Protagonista(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150, scale=1.5,
                       idle_count=6, run_count=10, jump_count=10, double_count=10)
-
 player_group = pygame.sprite.Group(player)
 bullets = pygame.sprite.Group()
 
-# --- Loop principal ---
+# --- Plataformas via pool ---
+platform_pool = PlatformPool(pool_size=12)
+# next spawn in world coordinates (camera_x is world offset for viewport)
+next_spawn_world_x = camera_x + SCREEN_WIDTH + random.randint(200, 400)
+SPAWN_MIN_DIST = 250
+SPAWN_MAX_DIST = 450
+
+# para centralizar o personagem na tela: sempre fixamos centerx
+# mas o mundo (camera_x) evolui quando há dx do jogador
 rodando = True
 while rodando:
     dt = clock.tick(FPS) / 1000.0  # segundos desde o último frame
 
+    # ---------------- event handling ----------------
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             rodando = False
-
-    # definindo o pulo
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_UP:
                 player.jump()
@@ -43,7 +52,7 @@ while rodando:
                 if proj:
                     bullets.add(proj)
 
-    #  Movimento horizontal
+    # ---------------- input & camera movement ----------------
     keys = pygame.key.get_pressed()
     dx = 0
     if keys[pygame.K_LEFT]:
@@ -51,25 +60,63 @@ while rodando:
     if keys[pygame.K_RIGHT]:
         dx = player.speed
     if keys[pygame.K_RIGHT] and keys[pygame.K_LEFT]:
-        dx=0
-    #Atualiza câmera e direção 
+        dx = 0
+
+    # atualiza câmera/world_x (quando o jogador 'anda', movemos o mundo)
+    # aqui camera_x representa o deslocamento em "mundo"
     if dx != 0:
         camera_x += dx
         player.facing = "right" if dx > 0 else "left"
 
-    #Gravidade e animação
-    player.aplicar_gravidade(CHAO_Y)
+    # calcula deslocamento da câmera deste frame (world-space)
+    camera_dx = camera_x - last_camera_x
+
+    # ---------------- atualizar plataformas (visualmente) ----------------
+    if camera_dx != 0:
+        for p in platform_pool.active_sprites():
+            p.update(camera_dx)
+    last_camera_x = camera_x
+
+    # ---------------- spawn dinâmico baseado em world_x ----------------
+    # spawn enquanto a borda direita da viewport alcançou next_spawn_world_x
+    while camera_x + SCREEN_WIDTH >= next_spawn_world_x:
+        p = platform_pool.get()
+        spawn_screen_x = next_spawn_world_x - camera_x
+        spawn_screen_y = random.randint(240, 420)
+        width = random.randint(140, 260)
+        p.activate(spawn_screen_x, spawn_screen_y, width=width, height=30, color=(150,150,150))
+        next_spawn_world_x += random.randint(SPAWN_MIN_DIST, SPAWN_MAX_DIST)
+
+    # ---------------- física e animação ----------------
+    # chamamos aplicar_gravidade com platforms se disponível; senão, cai para versão antiga
+    try:
+        # platform_pool.active_sprites() retorna apenas plataformas ativas (iterável)
+        player.aplicar_gravidade(CHAO_Y, platform_pool.active_sprites())
+    except TypeError:
+        # fallback: método antigo que só aceita chao_y
+        player.aplicar_gravidade(CHAO_Y)
+
     player.update(dt, moving=(dx != 0))
     bullets.update(dt)
 
-    # Mantém o personagem no centro
+    # Mantém o personagem no centro da tela (visual)
     player.rect.centerx = SCREEN_WIDTH // 2
-    
 
-    #Desenha fundo e personagem
+    # ---------------- desenho ----------------
     desenhar_parallax(screen, camadas_fundo, camera_x, SCREEN_WIDTH)
+
+    # desenha plataformas ativas (apenas as visíveis)
+    for p in platform_pool.active_sprites():
+        if p.rect.right >= -50 and p.rect.left <= SCREEN_WIDTH + 50:
+            screen.blit(p.image, p.rect)
+
+    # desenha player e projéteis
     screen.blit(player.image, player.rect)
     bullets.draw(screen)
+
+    # HUD simples (opcional)
+    # font = pygame.font.SysFont(None, 24)
+    # screen.blit(font.render(f"Camera X: {int(camera_x)}", True, (255,255,255)), (10,10))
 
     pygame.display.flip()
     screen.fill((0, 0, 0))

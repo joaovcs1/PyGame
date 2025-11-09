@@ -11,6 +11,8 @@ double_path = jump_path
 # disparo e projétil
 shot_path = os.path.join(base, "shelby_shot.png")
 bullet_path = os.path.join(base, "projetil_shelby.png")
+# animação de morte
+death_path = os.path.join(base, "shelby_dead.png")
 
 #imagens do plano de fundo
 caminhos = [

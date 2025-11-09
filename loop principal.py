@@ -1,5 +1,6 @@
 import pygame
 import random
+import math
 from Personagens import Protagonista
 from plano_de_fundo import carregar_camadas, desenhar_parallax
 from Inimigos import InimigoCyborg, spawn_inimigo_cyborg
@@ -34,6 +35,30 @@ enemies = pygame.sprite.Group()
 spawn_timer = 0.0
 spawn_interval = 4.0  # Spawna um inimigo a cada 4 segundos
 
+# --- Função para desenhar barra de vida vertical ---
+def desenhar_barra_vida(screen, player, x=20, y=50, width=30, height=300):
+    """Desenha uma barra de vida vertical no lado esquerdo da tela"""
+    # Cor de fundo (preto)
+    pygame.draw.rect(screen, (0, 0, 0), (x, y, width, height))
+    # Borda
+    pygame.draw.rect(screen, (255, 255, 255), (x, y, width, height), 2)
+    
+    # Calcula altura da barra de vida
+    health_percentage = player.get_health_percentage()
+    health_height = int(height * health_percentage)
+    
+    # Cor da barra de vida (verde -> amarelo -> vermelho)
+    if health_percentage > 0.6:
+        color = (0, 255, 0)  # Verde
+    elif health_percentage > 0.3:
+        color = (255, 255, 0)  # Amarelo
+    else:
+        color = (255, 0, 0)  # Vermelho
+    
+    # Desenha a barra de vida (de baixo para cima)
+    health_y = y + height - health_height
+    pygame.draw.rect(screen, color, (x + 2, health_y, width - 4, health_height))
+
 # --- Loop principal ---
 rodando = True
 while rodando:
@@ -43,33 +68,35 @@ while rodando:
         if event.type == pygame.QUIT:
             rodando = False
 
-    # definindo o pulo
+    # definindo o pulo - só funciona se o player estiver vivo
         elif event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_UP:
-                player.jump()
-            elif event.key == pygame.K_SPACE:
-                proj = player.shoot()
-                if proj:
-                    bullets.add(proj)
+            if not player.is_dying:
+                if event.key == pygame.K_UP:
+                    player.jump()
+                elif event.key == pygame.K_SPACE:
+                    proj = player.shoot()
+                    if proj:
+                        bullets.add(proj)
 
-    #  Movimento horizontal
+    #  Movimento horizontal - só funciona se o player estiver vivo
     # Bloqueia movimento se o personagem estiver atirando
-    keys = pygame.key.get_pressed()
     dx = 0
-    # Só permite movimento se não estiver atirando
-    if player.shot_timer <= 0:
-        if keys[pygame.K_LEFT]:
-            dx = -player.speed
-        if keys[pygame.K_RIGHT]:
-            dx = player.speed
-        if keys[pygame.K_RIGHT] and keys[pygame.K_LEFT]:
-            dx=0
-    #Atualiza câmera e direção 
-    if dx != 0:
-        camera_x += dx
-        player.facing = "right" if dx > 0 else "left"
+    if not player.is_dying:
+        keys = pygame.key.get_pressed()
+        # Só permite movimento se não estiver atirando
+        if player.shot_timer <= 0:
+            if keys[pygame.K_LEFT]:
+                dx = -player.speed
+            if keys[pygame.K_RIGHT]:
+                dx = player.speed
+            if keys[pygame.K_RIGHT] and keys[pygame.K_LEFT]:
+                dx=0
+        #Atualiza câmera e direção 
+        if dx != 0:
+            camera_x += dx
+            player.facing = "right" if dx > 0 else "left"
 
-    #Gravidade e animação
+    #Gravidade e animação (aplica gravidade mesmo quando morrendo para queda natural)
     player.aplicar_gravidade(CHAO_Y)
     player.update(dt, moving=(dx != 0))
 
@@ -90,14 +117,16 @@ while rodando:
         enemy.aplicar_gravidade(CHAO_Y)
         enemy.update(dt, camera_x, (player_world_x, player_world_y))
         
-        # Cyborg soca quando perto
+        # Cyborg soca quando perto - só causa dano se o player estiver vivo
         if enemy.alive and not enemy.is_dying and enemy.punch_timer > 0:
             # O enemy.rect já foi atualizado no update() com centerx correto
             # Usa o rect diretamente para verificar colisão
-            if enemy.rect.colliderect(player.rect):
-                # Aqui você pode adicionar sistema de dano ao player
-                # Por exemplo: player.take_damage(1)
-                pass
+            if enemy.rect.colliderect(player.rect) and not player.is_dying:
+                # Aplica dano ao player (com cooldown de invencibilidade)
+                if player.take_damage(1):
+                    print(f"Player recebeu dano! Vida: {player.health}/{player.max_health}")
+                    if player.is_dying:
+                        print("Player morreu! Mostrando animação de morte...")
     
     # --- Colisões de projéteis do player com inimigos ---
     # Verifica colisões DEPOIS de atualizar inimigos para ter rects corretos
@@ -133,14 +162,15 @@ while rodando:
             elif enemy.world_x > camera_x + SCREEN_WIDTH * 2:
                 enemy.kill()
     
-    # Spawn de novos inimigos (apenas Cyborg)
-    spawn_timer += dt
-    if spawn_timer >= spawn_interval:
-        spawn_timer = 0.0
-        # Alterna entre spawnar pela direita e esquerda
-        lado = random.choice(["direita", "esquerda"])
-        novo_inimigo = spawn_inimigo_cyborg(camera_x, CHAO_Y, SCREEN_WIDTH, player.rect.centery, x_offset=SCREEN_WIDTH, lado=lado)
-        enemies.add(novo_inimigo)
+    # Spawn de novos inimigos (apenas Cyborg) - apenas se o player estiver vivo
+    if player.is_alive() and not player.is_dying:
+        spawn_timer += dt
+        if spawn_timer >= spawn_interval:
+            spawn_timer = 0.0
+            # Alterna entre spawnar pela direita e esquerda
+            lado = random.choice(["direita", "esquerda"])
+            novo_inimigo = spawn_inimigo_cyborg(camera_x, CHAO_Y, SCREEN_WIDTH, player.rect.centery, x_offset=SCREEN_WIDTH, lado=lado)
+            enemies.add(novo_inimigo)
 
     #Desenha fundo e personagem
     desenhar_parallax(screen, camadas_fundo, camera_x, SCREEN_WIDTH)
@@ -156,11 +186,24 @@ while rodando:
             # Usa o rect diretamente que já está correto (centerx já foi atualizado)
             screen.blit(enemy.image, enemy.rect)
     
-    # Desenha protagonista
-    screen.blit(player.image, player.rect)
+    # Desenha protagonista (com efeito de piscar mais rápido quando sofre dano)
+    if player.is_dying:
+        # Quando morto, mostra a animação de morte sem piscar
+        screen.blit(player.image, player.rect)
+    elif player.invincibility_timer > 0:
+        # Pisca o personagem rapidamente quando invencível (animação de dano mais rápida)
+        # Multiplicador maior = piscar mais rápido (75 cria um efeito 1.5x mais rápido)
+        visible = math.sin(player.invincibility_timer * 75) > 0
+        if visible:
+            screen.blit(player.image, player.rect)
+    else:
+        screen.blit(player.image, player.rect)
     
     # Desenha projéteis
     bullets.draw(screen)  # Projéteis do protagonista
+    
+    # Desenha barra de vida por último para ficar sempre visível
+    desenhar_barra_vida(screen, player, x=20, y=100, width=20, height=300)
 
     pygame.display.flip()
     screen.fill((0, 0, 0))

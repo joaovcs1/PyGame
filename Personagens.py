@@ -47,7 +47,7 @@ class Protagonista(pygame.sprite.Sprite):
         self.max_health = 10
         self.health = 10
         self.invincibility_timer = 0.0
-        self.invincibility_duration = 1.0  # 1 segundo de invencibilidade após tomar dano
+        self.invincibility_duration = 0.5  # 0.5 segundos de invencibilidade após tomar dano
         
         # Estado de morte
         self.is_dying = False

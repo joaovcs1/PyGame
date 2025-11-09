@@ -192,8 +192,8 @@ while rodando:
         screen.blit(player.image, player.rect)
     elif player.invincibility_timer > 0:
         # Pisca o personagem rapidamente quando invencível (animação de dano mais rápida)
-        # Multiplicador maior = piscar mais rápido (50 cria um efeito mais rápido e visível)
-        visible = math.sin(player.invincibility_timer * 50) > 0
+        # Multiplicador maior = piscar mais rápido (75 cria um efeito 1.5x mais rápido)
+        visible = math.sin(player.invincibility_timer * 75) > 0
         if visible:
             screen.blit(player.image, player.rect)
     else:

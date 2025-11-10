@@ -280,6 +280,15 @@ class Protagonista(pygame.sprite.Sprite):
     def get_health_percentage(self):
         """Retorna a porcentagem de vida (0.0 a 1.0)"""
         return max(0.0, float(self.health) / float(self.max_health))
+    
+    def heal(self, amount=1):
+        """Restaura vida do player"""
+        if self.is_dying:
+            return False  # Não pode curar se está morrendo
+        
+        old_health = self.health
+        self.health = min(self.max_health, self.health + amount)
+        return self.health > old_health  # Retorna True se curou
  
     def shoot(self):
         """Dispara um projétil e aciona a animação de tiro. Retorna o sprite do projétil."""

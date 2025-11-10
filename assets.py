@@ -24,7 +24,7 @@ caminhos = [
 #inimigo careca
 base_2 = os.path.normpath("assets/Imagens/inimigo1")
 idle_careca = os.path.join(base_2,"Idle_2.png")
-shot_careca = os.path.join(base_2,"Shot.png")
+shot_careca = os.path.join(base_2,"Shot.png")  # Sprite sheet com 8 frames (frames 0-2,7 são idle, frames 3-6 são shot)
 run_careca = os.path.join(base_2,"Run.png")
 dead_careca = os.path.join(base_2,"Dead.png")
 
@@ -33,4 +33,15 @@ base_cyborg = os.path.normpath("assets/Imagens/3 Cyborg")
 cyborg_idle = os.path.join(base_cyborg, "Cyborg_idle.png")
 cyborg_run = os.path.join(base_cyborg, "Cyborg_run.png")
 cyborg_punch = os.path.join(base_cyborg, "Cyborg_punch.png")
+cyborg_attack2 = os.path.join(base_cyborg, "Cyborg_attack2.png")
+cyborg_attack3 = os.path.join(base_cyborg, "Cyborg_attack3.png")
 cyborg_death = os.path.join(base_cyborg, "Cyborg_death.png")
+
+#efeitos de fogo
+base_fire = os.path.normpath("assets/Imagens/pack_effect_fire_column/fire_column_medium")
+fire_frames_paths = [
+    os.path.join(base_fire, f"fire_column_medium_{i}.png") for i in range(1, 15)
+]
+
+#item coração
+heart_path = os.path.normpath("assets/Imagens/Vida.png")

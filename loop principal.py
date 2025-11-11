@@ -8,6 +8,7 @@ from Inimigos import InimigoCyborg, spawn_inimigo_cyborg, Careca, spawn_careca, 
 from assets import heart_path
 
 pygame.init()
+pygame.mixer.init()  # Inicializa o mixer de áudio
 
 # --- Configurações da tela ---
 LARGURA_TELA, ALTURA_TELA = 800, 600
@@ -15,6 +16,35 @@ tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
 pygame.display.set_caption("THOMAS VELOZES & SHELBYS FURIOSOS")
 relogio = pygame.time.Clock()
 FPS = 60
+
+# --- Carrega arquivos de áudio ---
+# Música de fundo
+caminho_musica_fundo = os.path.normpath("assets/Musicas/cyberpunk-street.mp3")
+# Sons de tiro
+caminho_som_tiro_careca = os.path.normpath("assets/Musicas/Som Tiro Careca.mp3")
+caminho_som_tiro_shelby = os.path.normpath("assets/Musicas/Som Tiro Shelby.mp3")
+
+# Carrega os sons
+# Música de fundo (usa pygame.mixer.music, não precisa de variável)
+try:
+    pygame.mixer.music.load(caminho_musica_fundo)
+    musica_fundo_carregada = True
+except Exception as e:
+    print(f"Erro ao carregar música de fundo: {e}")
+    musica_fundo_carregada = False
+
+# Sons de efeito (usam pygame.mixer.Sound)
+try:
+    som_tiro_careca = pygame.mixer.Sound(caminho_som_tiro_careca)
+except Exception as e:
+    print(f"Erro ao carregar som de tiro do Careca: {e}")
+    som_tiro_careca = None
+
+try:
+    som_tiro_shelby = pygame.mixer.Sound(caminho_som_tiro_shelby)
+except Exception as e:
+    print(f"Erro ao carregar som de tiro do Shelby: {e}")
+    som_tiro_shelby = None
 
 # --- Tela de Introdução ---
 def mostrar_tela_introducao():
@@ -184,6 +214,13 @@ if not mostrar_tela_introducao():
 if not obter_nome_usuario():
     pygame.quit()
     exit()
+
+# --- Inicia música de fundo (após pressionar ENTER) ---
+if musica_fundo_carregada:
+    try:
+        pygame.mixer.music.play(-1)  # -1 = loop infinito
+    except Exception as e:
+        print(f"Erro ao tocar música de fundo: {e}")
 
 # --- Fundo ---
 camadas_fundo = carregar_camadas(ALTURA_TELA)
@@ -370,6 +407,13 @@ while rodando:
                 # NÃO salva aqui porque já foi salvo quando o jogador morreu
                 # A função salvar_jogador_atual() já foi chamada quando detectou a morte
                 
+                # Para a música de fundo antes de reiniciar (se ainda estiver tocando)
+                if musica_fundo_carregada:
+                    try:
+                        pygame.mixer.music.stop()
+                    except Exception as e:
+                        print(f"Erro ao parar música de fundo: {e}")
+                
                 # Volta ao início: mostra tela de introdução e pop-up de nome
                 if not mostrar_tela_introducao():
                     rodando = False
@@ -379,13 +423,18 @@ while rodando:
                     rodando = False
                     continue
                 
-                # Reinicia o jogo
+                # Reinicia o jogo e toca música de fundo novamente
                 reiniciar_jogo()
+                if musica_fundo_carregada:
+                    try:
+                        pygame.mixer.music.play(-1)  # -1 = loop infinito
+                    except Exception as e:
+                        print(f"Erro ao tocar música de fundo: {e}")
                 game_over = False
                 game_over_timer = 0.0
                 mostrando_popup = False
                 jogador_morreu_nao_detectado = True
-            # definindo o pulo - só funciona se o jogador estiver vivo
+            # definindo o pulo e tiro - só funciona se o jogador estiver vivo
             elif not jogador.is_dying and not game_over:
                 if evento.key == pygame.K_UP:
                     jogador.jump()
@@ -393,11 +442,23 @@ while rodando:
                     projetil = jogador.shoot()
                     if projetil:
                         projeteis.add(projetil)
+                        # Toca som de tiro do Shelby
+                        if som_tiro_shelby is not None:
+                            try:
+                                som_tiro_shelby.play()
+                            except Exception as e:
+                                print(f"Erro ao tocar som de tiro do Shelby: {e}")
 
     # --- Detecção de morte do jogador ---
     if jogador.is_dying and jogador_morreu_nao_detectado:
         # Jogador acabou de morrer - salva no histórico e inicia game over
         salvar_jogador_atual()
+        # Para a música de fundo quando o jogador morre
+        if musica_fundo_carregada:
+            try:
+                pygame.mixer.music.stop()
+            except Exception as e:
+                print(f"Erro ao parar música de fundo: {e}")
         game_over = True
         game_over_timer = 0.0
         mostrando_popup = False
@@ -548,6 +609,12 @@ while rodando:
                         projetil = inimigo.shoot(posicao_mundo_x_jogador, posicao_mundo_y_jogador)
                         if projetil:
                             projeteis_inimigos.add(projetil)
+                            # Toca som de tiro do Careca
+                            if som_tiro_careca is not None:
+                                try:
+                                    som_tiro_careca.play()
+                                except Exception as e:
+                                    print(f"Erro ao tocar som de tiro do Careca: {e}")
             
             # Atualiza o inimigo (agora com shot_timer já definido se o Careca atirou)
             inimigo.update(delta_tempo, camera_x, (posicao_mundo_x_jogador, posicao_mundo_y_jogador))

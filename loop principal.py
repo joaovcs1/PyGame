@@ -1,6 +1,7 @@
 import pygame
 import random
 import math
+import os
 from Personagens import Protagonista
 from plano_de_fundo import carregar_camadas, desenhar_parallax
 from Inimigos import InimigoCyborg, spawn_inimigo_cyborg, Careca, spawn_careca, ProjetilInimigo, ColunaFogo, Plataforma, Coracao
@@ -14,6 +15,59 @@ tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
 pygame.display.set_caption("THOMAS VELOZES & SHELBYS FURIOSOS")
 relogio = pygame.time.Clock()
 FPS = 60
+
+# --- Tela de Introdução ---
+def mostrar_tela_introducao():
+    """Mostra a tela de introdução por 5 segundos"""
+    # Caminho da imagem de introdução
+    caminho_intro = os.path.normpath("assets/Imagens/Intro/Capa.png")
+    
+    # Tenta carregar a imagem
+    try:
+        imagem_intro = pygame.image.load(caminho_intro).convert()
+        # Redimensiona a imagem para preencher toda a tela (800x600)
+        imagem_intro = pygame.transform.smoothscale(imagem_intro, (LARGURA_TELA, ALTURA_TELA))
+        x_intro = 0
+        y_intro = 0
+    except Exception:
+        # Se não encontrar a imagem, cria uma tela preta simples
+        imagem_intro = pygame.Surface((LARGURA_TELA, ALTURA_TELA))
+        imagem_intro.fill((0, 0, 0))
+        x_intro = 0
+        y_intro = 0
+    
+    # Timer para a tela de introdução
+    tempo_intro = 0.0
+    duracao_intro = 5.0  # 5 segundos
+    
+    intro_rodando = True
+    while intro_rodando:
+        delta_tempo = relogio.tick(FPS) / 1000.0
+        
+        # Processa eventos
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                return False  # Fecha o jogo
+            elif evento.type == pygame.KEYDOWN or evento.type == pygame.MOUSEBUTTONDOWN:
+                # Permite pular a introdução pressionando qualquer tecla ou clicando
+                intro_rodando = False
+        
+        # Atualiza timer
+        tempo_intro += delta_tempo
+        if tempo_intro >= duracao_intro:
+            intro_rodando = False
+        
+        # Desenha a imagem de introdução
+        tela.fill((0, 0, 0))  # Fundo preto
+        tela.blit(imagem_intro, (x_intro, y_intro))
+        pygame.display.flip()
+    
+    return True  # Continua para o jogo
+
+# Mostra a tela de introdução
+if not mostrar_tela_introducao():
+    pygame.quit()
+    exit()
 
 # --- Fundo ---
 camadas_fundo = carregar_camadas(ALTURA_TELA)

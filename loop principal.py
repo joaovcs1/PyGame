@@ -452,7 +452,7 @@ while rodando:
                 temporizador_spawn_coracao = 0.0
                 # Spawna coração mais longe do jogador (no chão) - à frente da tela visível
                 posicao_x_coracao = camera_x + random.randint(LARGURA_TELA + 200, LARGURA_TELA * 2)  # Spawna longe, à frente do jogador
-                coracao = Coracao(posicao_x_coracao, CHAO_Y, scale=1.0)  # Tamanho fixo de 30x30 pixels
+                coracao = Coracao(posicao_x_coracao, CHAO_Y, escala=1.0)  # Tamanho fixo de 30x30 pixels
                 # Ajusta o bottom do coração para ficar no chão
                 coracao.world_y = CHAO_Y
                 # Atualiza a posição baseada na câmera (o update vai ajustar o rect)

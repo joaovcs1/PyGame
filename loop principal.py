@@ -9,527 +9,521 @@ from assets import heart_path
 pygame.init()
 
 # --- Configurações da tela ---
-SCREEN_WIDTH, SCREEN_HEIGHT = 800, 600
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Personagem centralizado com pulo (sem chão)")
-clock = pygame.time.Clock()
+LARGURA_TELA, ALTURA_TELA = 800, 600
+tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
+pygame.display.set_caption("THOMAS VELOZES & SHELBYS FURIOSOS")
+relogio = pygame.time.Clock()
 FPS = 60
 
 # --- Fundo ---
-camadas_fundo = carregar_camadas(SCREEN_HEIGHT)
+camadas_fundo = carregar_camadas(ALTURA_TELA)
 camera_x = 0.0
 
 # --- Altura do chão visual (personagem pisa sobre o cenário) ---
 CHAO_Y = 550   
 
-# --- Player ---
-player = Protagonista(SCREEN_WIDTH // 2, SCREEN_HEIGHT - 150, scale=1.5,
+# --- Jogador ---
+jogador = Protagonista(LARGURA_TELA // 2, ALTURA_TELA - 150, scale=1.5,
                       idle_count=6, run_count=10, jump_count=10, double_count=10)
 
-player_group = pygame.sprite.Group(player)
-bullets = pygame.sprite.Group()  # Projéteis do protagonista
+grupo_jogador = pygame.sprite.Group(jogador)
+projeteis = pygame.sprite.Group()  # Projéteis do protagonista
 
 # --- Inimigos ---
-enemies = pygame.sprite.Group()
-enemy_bullets = pygame.sprite.Group()  # Projéteis dos inimigos
+inimigos = pygame.sprite.Group()
+projeteis_inimigos = pygame.sprite.Group()  # Projéteis dos inimigos
 
 # --- Obstáculos ---
-fire_columns = pygame.sprite.Group()  # Colunas de fogo como obstáculos
-platforms = pygame.sprite.Group()  # Plataformas antes das colunas de fogo
+colunas_fogo = pygame.sprite.Group()  # Colunas de fogo como obstáculos
+plataformas = pygame.sprite.Group()  # Plataformas antes das colunas de fogo
 
 # --- Itens ---
-hearts = pygame.sprite.Group()  # Corações que restauram vida
+coracoes = pygame.sprite.Group()  # Corações que restauram vida
 
 # Controle de spawn
-spawn_timer = 0.0
-spawn_interval = 4.0  # Spawna um inimigo a cada 4 segundos
+temporizador_spawn = 0.0
+intervalo_spawn = 4.0  # Spawna um inimigo a cada 4 segundos
 
 # Controle de spawn de colunas de fogo
-fire_spawn_timer = 0.0
-fire_spawn_interval = 6.0  # Spawna uma coluna de fogo a cada 6 segundos
+temporizador_spawn_fogo = 0.0
+intervalo_spawn_fogo = 6.0  # Spawna uma coluna de fogo a cada 6 segundos
 
 # Controle de spawn de corações
-heart_spawn_timer = 0.0
-heart_spawn_interval = 15.0  # Spawna um coração a cada 15 segundos
-MAX_HEARTS_ON_SCREEN = 3  # Máximo de corações na tela simultaneamente
+temporizador_spawn_coracao = 0.0
+intervalo_spawn_coracao = 15.0  # Spawna um coração a cada 15 segundos
+MAX_CORACOES_NA_TELA = 3  # Máximo de corações na tela simultaneamente
 
 # --- Carrega imagens dos corações uma vez (otimização de performance) ---
-_heart_img_cache = None
-_heart_img_empty_cache = None
-_heart_img_half_cache = None
-_heart_size_cache = None
+_cache_imagem_coracao = None
+_cache_imagem_coracao_vazia = None
+_cache_imagem_meio_coracao = None
+_cache_tamanho_coracao = None
 
-def _get_heart_images(heart_size=30):
+def _obter_imagens_coracao(tamanho_coracao=30):
     """Carrega e cacheia as imagens dos corações (só carrega uma vez)"""
-    global _heart_img_cache, _heart_img_empty_cache, _heart_img_half_cache, _heart_size_cache
+    global _cache_imagem_coracao, _cache_imagem_coracao_vazia, _cache_imagem_meio_coracao, _cache_tamanho_coracao
     
     # Se já carregou e o tamanho é o mesmo, reutiliza
-    if _heart_img_cache is not None and _heart_size_cache == heart_size:
-        return _heart_img_cache, _heart_img_empty_cache, _heart_img_half_cache
+    if _cache_imagem_coracao is not None and _cache_tamanho_coracao == tamanho_coracao:
+        return _cache_imagem_coracao, _cache_imagem_coracao_vazia, _cache_imagem_meio_coracao
     
     # Carrega a imagem do coração uma vez
     try:
-        heart_img = pygame.image.load(heart_path).convert_alpha()
-        heart_img = pygame.transform.scale(heart_img, (heart_size, heart_size))
+        imagem_coracao = pygame.image.load(heart_path).convert_alpha()
+        imagem_coracao = pygame.transform.scale(imagem_coracao, (tamanho_coracao, tamanho_coracao))
     except Exception:
         # Fallback: cria um coração simples
-        heart_img = pygame.Surface((heart_size, heart_size), pygame.SRCALPHA)
-        heart_img.fill((255, 0, 0))
+        imagem_coracao = pygame.Surface((tamanho_coracao, tamanho_coracao), pygame.SRCALPHA)
+        imagem_coracao.fill((255, 0, 0))
     
     # Cria versão vazia (cinza) uma vez
-    empty_heart = heart_img.copy()
-    empty_heart.fill((100, 100, 100), special_flags=pygame.BLEND_RGBA_MULT)
+    coracao_vazio = imagem_coracao.copy()
+    coracao_vazio.fill((100, 100, 100), special_flags=pygame.BLEND_RGBA_MULT)
     
     # Cria versão meio coração (transparente) uma vez
-    half_heart = heart_img.copy()
-    half_heart.set_alpha(128)
+    meio_coracao = imagem_coracao.copy()
+    meio_coracao.set_alpha(128)
     
     # Cacheia
-    _heart_img_cache = heart_img
-    _heart_img_empty_cache = empty_heart
-    _heart_img_half_cache = half_heart
-    _heart_size_cache = heart_size
+    _cache_imagem_coracao = imagem_coracao
+    _cache_imagem_coracao_vazia = coracao_vazio
+    _cache_imagem_meio_coracao = meio_coracao
+    _cache_tamanho_coracao = tamanho_coracao
     
-    return heart_img, empty_heart, half_heart
+    return imagem_coracao, coracao_vazio, meio_coracao
 
 # --- Função para desenhar corações de vida ---
-def desenhar_coracoes_vida(screen, player, x=20, y=20, heart_size=30):
+def desenhar_coracoes_vida(tela, jogador, x=20, y=20, tamanho_coracao=30):
     """Desenha corações de vida (5 corações, cada um vale 2 vidas)"""
     # Usa imagens em cache (não carrega a cada frame)
-    heart_img, empty_heart, half_heart = _get_heart_images(heart_size)
+    imagem_coracao, coracao_vazio, meio_coracao = _obter_imagens_coracao(tamanho_coracao)
     
     # Total de corações: 5 (cada um vale 2 vidas)
-    total_hearts = 5
-    hearts_per_row = 5
-    spacing = 5  # Espaçamento entre corações
+    total_coracoes = 5
+    coracoes_por_linha = 5
+    espacamento = 5  # Espaçamento entre corações
     
     # Calcula quantos corações cheios e meio corações
-    health = player.health
-    full_hearts = health // 2  # Corações completos (2 vidas cada)
-    has_half_heart = (health % 2) == 1  # Meio coração se tiver 1 vida restante
+    vida = jogador.health
+    coracoes_cheios = vida // 2  # Corações completos (2 vidas cada)
+    tem_meio_coracao = (vida % 2) == 1  # Meio coração se tiver 1 vida restante
     
-    for i in range(total_hearts):
+    for i in range(total_coracoes):
         # Calcula posição do coração
-        row = i // hearts_per_row
-        col = i % hearts_per_row
-        heart_x = x + col * (heart_size + spacing)
-        heart_y = y + row * (heart_size + spacing)
+        linha = i // coracoes_por_linha
+        coluna = i % coracoes_por_linha
+        x_coracao = x + coluna * (tamanho_coracao + espacamento)
+        y_coracao = y + linha * (tamanho_coracao + espacamento)
         
-        if i < full_hearts:
+        if i < coracoes_cheios:
             # Coração cheio
-            screen.blit(heart_img, (heart_x, heart_y))
-        elif i == full_hearts and has_half_heart:
+            tela.blit(imagem_coracao, (x_coracao, y_coracao))
+        elif i == coracoes_cheios and tem_meio_coracao:
             # Meio coração (usa versão em cache)
-            screen.blit(half_heart, (heart_x, heart_y))
+            tela.blit(meio_coracao, (x_coracao, y_coracao))
         else:
             # Coração vazio (usa a versão em cache)
-            screen.blit(empty_heart, (heart_x, heart_y))
+            tela.blit(coracao_vazio, (x_coracao, y_coracao))
 
 # --- Loop principal ---
 rodando = True
 while rodando:
-    dt = clock.tick(FPS) / 1000.0  # segundos desde o último frame
+    delta_tempo = relogio.tick(FPS) / 1000.0  # segundos desde o último frame
 
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
+    for evento in pygame.event.get():
+        if evento.type == pygame.QUIT:
             rodando = False
 
-    # definindo o pulo - só funciona se o player estiver vivo
-        elif event.type == pygame.KEYDOWN:
-            if not player.is_dying:
-                if event.key == pygame.K_UP:
-                    player.jump()
-                elif event.key == pygame.K_SPACE:
-                    proj = player.shoot()
-                    if proj:
-                        bullets.add(proj)
+    # definindo o pulo - só funciona se o jogador estiver vivo
+        elif evento.type == pygame.KEYDOWN:
+            if not jogador.is_dying:
+                if evento.key == pygame.K_UP:
+                    jogador.jump()
+                elif evento.key == pygame.K_SPACE:
+                    projetil = jogador.shoot()
+                    if projetil:
+                        projeteis.add(projetil)
 
-    #  Movimento horizontal - só funciona se o player estiver vivo
+    #  Movimento horizontal - só funciona se o jogador estiver vivo
     # Bloqueia movimento se o personagem estiver atirando
-    dx = 0
-    if not player.is_dying:
-        keys = pygame.key.get_pressed()
+    delta_x = 0
+    if not jogador.is_dying:
+        teclas = pygame.key.get_pressed()
         # Só permite movimento se não estiver atirando
-        if player.shot_timer <= 0:
-            if keys[pygame.K_LEFT]:
-                dx = -player.speed
-            if keys[pygame.K_RIGHT]:
-                dx = player.speed
-            if keys[pygame.K_RIGHT] and keys[pygame.K_LEFT]:
-                dx=0
+        if jogador.shot_timer <= 0:
+            if teclas[pygame.K_LEFT]:
+                delta_x = -jogador.speed
+            if teclas[pygame.K_RIGHT]:
+                delta_x = jogador.speed
+            if teclas[pygame.K_RIGHT] and teclas[pygame.K_LEFT]:
+                delta_x=0
         #Atualiza câmera e direção 
-        if dx != 0:
-            camera_x += dx
-            player.facing = "right" if dx > 0 else "left"
+        if delta_x != 0:
+            camera_x += delta_x
+            jogador.facing = "right" if delta_x > 0 else "left"
 
     # Mantém o personagem no centro
-    player.rect.centerx = SCREEN_WIDTH // 2
+    jogador.rect.centerx = LARGURA_TELA // 2
     
     # Atualiza plataformas ANTES de verificar colisões (para ter rects atualizados)
-    for platform in platforms:
-        platform.update(camera_x)
+    for plataforma in plataformas:
+        plataforma.update(camera_x)
     
     # Aplica gravidade ANTES de verificar colisões
-    player.vel_y += player.gravidade
-    player.rect.y += int(player.vel_y)
+    jogador.vel_y += jogador.gravidade
+    jogador.rect.y += int(jogador.vel_y)
     
     # Verifica colisão com plataformas PRIMEIRO
-    on_platform = False
-    for platform in platforms:
-        # Verifica se o player está horizontalmente sobre a plataforma
-        player_centerx = player.rect.centerx
-        platform_left = platform.rect.left
-        platform_right = platform.rect.right
+    em_plataforma = False
+    for plataforma in plataformas:
+        # Verifica se o jogador está horizontalmente sobre a plataforma
+        centro_x_jogador = jogador.rect.centerx
+        esquerda_plataforma = plataforma.rect.left
+        direita_plataforma = plataforma.rect.right
         
-        if player_centerx >= platform_left and player_centerx <= platform_right:
-            # Verifica se o player está verticalmente próximo do topo da plataforma
-            player_bottom = player.rect.bottom
-            platform_top = platform.rect.top
+        if centro_x_jogador >= esquerda_plataforma and centro_x_jogador <= direita_plataforma:
+            # Verifica se o jogador está verticalmente próximo do topo da plataforma
+            base_jogador = jogador.rect.bottom
+            topo_plataforma = plataforma.rect.top
             
-            # Se o bottom do player está entre o topo da plataforma (com tolerância)
-            # Aumenta a tolerância superior para manter o player na plataforma
-            if player_bottom >= platform_top - 10 and player_bottom <= platform_top + 25:
+            # Se o bottom do jogador está entre o topo da plataforma (com tolerância)
+            # Aumenta a tolerância superior para manter o jogador na plataforma
+            if base_jogador >= topo_plataforma - 10 and base_jogador <= topo_plataforma + 25:
                 # Se está caindo, parado, ou ligeiramente acima (mas ainda dentro da tolerância)
-                if player.vel_y >= -2:  # Permite pequena velocidade para cima mas ainda considera em cima
+                if jogador.vel_y >= -2:  # Permite pequena velocidade para cima mas ainda considera em cima
                     # Coloca em cima da plataforma
-                    player.rect.bottom = platform_top
-                    if player.vel_y > 0:  # Só zera velocidade se estava caindo
-                        player.vel_y = 0.0
-                    on_platform = True
-                    player.no_chao = True
-                    player.can_double_jump = True
-                    player.used_double = False
+                    jogador.rect.bottom = topo_plataforma
+                    if jogador.vel_y > 0:  # Só zera velocidade se estava caindo
+                        jogador.vel_y = 0.0
+                    em_plataforma = True
+                    jogador.no_chao = True
+                    jogador.can_double_jump = True
+                    jogador.used_double = False
                     break
     
     # Se não está em plataforma, verifica chão
-    if not on_platform:
-        if player.rect.bottom >= CHAO_Y:
-            player.rect.bottom = CHAO_Y
-            player.vel_y = 0.0
-            player.no_chao = True
-            player.can_double_jump = True
-            player.used_double = False
+    if not em_plataforma:
+        if jogador.rect.bottom >= CHAO_Y:
+            jogador.rect.bottom = CHAO_Y
+            jogador.vel_y = 0.0
+            jogador.no_chao = True
+            jogador.can_double_jump = True
+            jogador.used_double = False
         else:
-            player.no_chao = False
+            jogador.no_chao = False
     
     # Agora atualiza a animação (já com no_chao correto)
-    player.update(dt, moving=(dx != 0))
+    jogador.update(delta_tempo, moving=(delta_x != 0))
     
     # Posição do protagonista no mundo (para os inimigos)
-    player_world_x = camera_x + player.rect.centerx
-    player_world_y = player.rect.centery
+    posicao_mundo_x_jogador = camera_x + jogador.rect.centerx
+    posicao_mundo_y_jogador = jogador.rect.centery
     
-    # Atualiza os projéteis do player primeiro
-    bullets.update(dt)
+    # Atualiza os projéteis do jogador primeiro
+    projeteis.update(delta_tempo)
     
     # Atualiza projéteis dos inimigos
-    enemy_bullets.update(dt)
+    projeteis_inimigos.update(delta_tempo)
     
     # Atualiza colunas de fogo
-    for fire_column in fire_columns:
-        fire_column.update(dt, camera_x)
+    for coluna_fogo in colunas_fogo:
+        coluna_fogo.update(delta_tempo, camera_x)
     
     # Atualiza corações
-    for heart in hearts:
-        heart.update(dt, camera_x)
+    for coracao in coracoes:
+        coracao.update(delta_tempo, camera_x)
     
     # --- Sistema de Inimigos ---
     # Atualiza inimigos PRIMEIRO para ter rects atualizados
-    for enemy in enemies:
+    for inimigo in inimigos:
          # Aplica gravidade e verifica colisão com plataformas
-        enemy.vel_y += enemy.gravidade
-        enemy.rect.y += int(enemy.vel_y)
+        inimigo.vel_y += inimigo.gravidade
+        inimigo.rect.y += int(inimigo.vel_y)
         
         # Verifica colisão com plataformas
-        enemy_on_platform = False
-        for platform in platforms:
-            if enemy.rect.colliderect(platform.rect):
+        inimigo_em_plataforma = False
+        for plataforma in plataformas:
+            if inimigo.rect.colliderect(plataforma.rect):
                 # Verifica se o inimigo está em cima da plataforma
-                enemy_bottom = enemy.rect.bottom
-                platform_top = platform.world_y
+                base_inimigo = inimigo.rect.bottom
+                topo_plataforma = plataforma.world_y
                 # Tolerância para detectar quando está em cima
-                if enemy_bottom >= platform_top - 10 and enemy_bottom <= platform_top + 15:
+                if base_inimigo >= topo_plataforma - 10 and base_inimigo <= topo_plataforma + 15:
                     # Se está caindo ou parado, coloca em cima da plataforma
-                    if enemy.vel_y >= 0:
-                        enemy.rect.bottom = platform_top
-                        enemy.vel_y = 0.0
-                        enemy_on_platform = True
-                        enemy.no_chao = True
+                    if inimigo.vel_y >= 0:
+                        inimigo.rect.bottom = topo_plataforma
+                        inimigo.vel_y = 0.0
+                        inimigo_em_plataforma = True
+                        inimigo.no_chao = True
                         break
         
         # Se não está em plataforma, verifica chão
-        if not enemy_on_platform:
-            if enemy.rect.bottom >= CHAO_Y:
-                enemy.rect.bottom = CHAO_Y
-                enemy.vel_y = 0.0
-                enemy.no_chao = True
+        if not inimigo_em_plataforma:
+            if inimigo.rect.bottom >= CHAO_Y:
+                inimigo.rect.bottom = CHAO_Y
+                inimigo.vel_y = 0.0
+                inimigo.no_chao = True
             else:
-                enemy.no_chao = False
+                inimigo.no_chao = False
         
-        enemy.update(dt, camera_x, (player_world_x, player_world_y))
+        inimigo.update(delta_tempo, camera_x, (posicao_mundo_x_jogador, posicao_mundo_y_jogador))
         
-        # Cyborg soca quando perto - só causa dano se o player estiver vivo
-        if isinstance(enemy, InimigoCyborg):
-            if enemy.alive and not enemy.is_dying and enemy.punch_timer > 0:
-                # O enemy.rect já foi atualizado no update() com centerx correto
+        # Cyborg soca quando perto - só causa dano se o jogador estiver vivo
+        if isinstance(inimigo, InimigoCyborg):
+            if inimigo.alive and not inimigo.is_dying and inimigo.punch_timer > 0:
+                # O inimigo.rect já foi atualizado no update() com centerx correto
                 # Usa o rect diretamente para verificar colisão
-                if enemy.rect.colliderect(player.rect) and not player.is_dying:
-                    # Aplica dano ao player (com cooldown de invencibilidade)
-                    if player.take_damage(1):
-                        print(f"Player recebeu dano! Vida: {player.health}/{player.max_health}")
-                        if player.is_dying:
-                            print("Player morreu! Mostrando animação de morte...")
+                if inimigo.rect.colliderect(jogador.rect) and not jogador.is_dying:
+                    # Aplica dano ao jogador (com cooldown de invencibilidade)
+                    jogador.take_damage(1)
         
-        # Careca atira quando detecta o player
-        elif isinstance(enemy, Careca):
-            if enemy.alive and not enemy.is_dying and not player.is_dying:
-                if enemy.pode_atirar(player_world_x, player_world_y):
-                    proj = enemy.shoot(player_world_x, player_world_y)
-                    if proj:
-                        enemy_bullets.add(proj)
+        # Careca atira quando detecta o jogador
+        elif isinstance(inimigo, Careca):
+            if inimigo.alive and not inimigo.is_dying and not jogador.is_dying:
+                if inimigo.pode_atirar(posicao_mundo_x_jogador, posicao_mundo_y_jogador):
+                    projetil = inimigo.shoot(posicao_mundo_x_jogador, posicao_mundo_y_jogador)
+                    if projetil:
+                        projeteis_inimigos.add(projetil)
     
-    # --- Colisões de projéteis do player com inimigos ---
+    # --- Colisões de projéteis do jogador com inimigos ---
     # Verifica colisões DEPOIS de atualizar inimigos para ter rects corretos
-    for bullet in list(bullets):
+    for bala in list(projeteis):
         # Verifica se a bala ainda existe (pode ter sido removida em iteração anterior)
-        if bullet not in bullets:
+        if bala not in projeteis:
             continue
             
-        hit_enemy = None
+        inimigo_atingido = None
         
-        for enemy in list(enemies):
+        for inimigo in list(inimigos):
             # Verifica se o inimigo está válido (vivo e não morrendo)
-            if not enemy.alive or enemy.is_dying:
+            if not inimigo.alive or inimigo.is_dying:
                 continue
 
             # Usa o rect do inimigo que já foi atualizado no update()
-            # O enemy.rect.x já está correto (world_x - camera_x)
+            # O inimigo.rect.x já está correto (world_x - camera_x)
             # Verifica colisão diretamente com o rect atualizado
-            if bullet.rect.colliderect(enemy.rect):
-                hit_enemy = enemy
+            if bala.rect.colliderect(inimigo.rect):
+                inimigo_atingido = inimigo
                 # Remove o projétil IMEDIATAMENTE para evitar que acerte outros inimigos
-                bullet.kill()
+                bala.kill()
                 # Aplica dano apenas ao primeiro inimigo acertado
-                hit_enemy.take_damage(3)  # Dano aumentado para 3
+                inimigo_atingido.take_damage(3)  # Dano aumentado para 3
                 break  # Para imediatamente após encontrar e processar colisão
     
     # Remove inimigos que saíram muito atrás ou à frente da câmera
     # (mas não remove os que estão morrendo, para mostrar a animação)
-    for enemy in list(enemies):
-        if not enemy.is_dying:  # Só remove se não estiver morrendo
+    for inimigo in list(inimigos):
+        if not inimigo.is_dying:  # Só remove se não estiver morrendo
             # Remove se saiu muito atrás da câmera
-            if enemy.world_x < camera_x - SCREEN_WIDTH:
-                enemy.kill()
+            if inimigo.world_x < camera_x - LARGURA_TELA:
+                inimigo.kill()
             # Remove se saiu muito à frente da câmera
-            elif enemy.world_x > camera_x + SCREEN_WIDTH * 2:
-                enemy.kill()
+            elif inimigo.world_x > camera_x + LARGURA_TELA * 2:
+                inimigo.kill()
     
-    # Projéteis dos inimigos acertam o player
-    player_hits = pygame.sprite.spritecollide(player, enemy_bullets, True)
-    if player_hits and not player.is_dying:
-        # Aplica dano ao player (o sistema de invencibilidade impede múltiplos danos)
-        if player.take_damage(1):
-            print(f"Player recebeu dano de projétil! Vida: {player.health}/{player.max_health}")
+    # Projéteis dos inimigos acertam o jogador
+    jogador_atingido = pygame.sprite.spritecollide(jogador, projeteis_inimigos, True)
+    if jogador_atingido and not jogador.is_dying:
+        # Aplica dano ao jogador (o sistema de invencibilidade impede múltiplos danos)
+        jogador.take_damage(1)
     
-    # Colisão do player com corações
-    heart_collisions = pygame.sprite.spritecollide(player, hearts, True)
-    for heart in heart_collisions:
-        if not player.is_dying:
-            if player.heal(2):  # Restaura 2 de vida
-                print(f"Player coletou coração! Vida: {player.health}/{player.max_health}")
+    # Colisão do jogador com corações
+    colisoes_coracao = pygame.sprite.spritecollide(jogador, coracoes, True)
+    for coracao in colisoes_coracao:
+        if not jogador.is_dying:
+            jogador.heal(2)  # Restaura 2 de vida
     
-    # Colisão do player com colunas de fogo (apenas se estiver no mesmo X)
-    for fire_column in fire_columns:
-        # Verifica se o player está no mesmo X (com pequena tolerância)
-        player_centerx = player.rect.centerx
-        fire_centerx = fire_column.rect.centerx
-        x_distance = abs(player_centerx - fire_centerx)
+    # Colisão do jogador com colunas de fogo (apenas se estiver no mesmo X)
+    for coluna_fogo in colunas_fogo:
+        # Verifica se o jogador está no mesmo X (com pequena tolerância)
+        centro_x_jogador = jogador.rect.centerx
+        centro_x_fogo = coluna_fogo.rect.centerx
+        distancia_x = abs(centro_x_jogador - centro_x_fogo)
         
         # Tolerância muito pequena: apenas 10 pixels de diferença em X
-        if x_distance <= 10:
+        if distancia_x <= 10:
             # Verifica se está entre o chão (bottom da coluna) e uma altura específica acima
-            fire_bottom = fire_column.rect.bottom
-            fire_centery = fire_column.rect.centery
-            altura_dano = fire_centery - 30  # Do chão até 30 pixels acima do centro
+            base_fogo = coluna_fogo.rect.bottom
+            centro_y_fogo = coluna_fogo.rect.centery
+            altura_dano = centro_y_fogo - 30  # Do chão até 30 pixels acima do centro
             
-            # Player deve estar entre o chão e a altura máxima de dano
-            # Verifica se qualquer parte do player está na área de dano (do chão até altura_dano)
-            # O player está na área se seu bottom está acima do chão E seu top está abaixo da altura máxima
-            if player.rect.bottom >= fire_bottom and player.rect.top <= altura_dano:
-                if fire_column.can_damage() and not player.is_dying:
-                    if player.take_damage(1):
-                        fire_column.apply_damage()
-                        print(f"Player recebeu dano de coluna de fogo! Vida: {player.health}/{player.max_health}")
+            # Jogador deve estar entre o chão e a altura máxima de dano
+            # Verifica se qualquer parte do jogador está na área de dano (do chão até altura_dano)
+            # O jogador está na área se seu bottom está acima do chão E seu top está abaixo da altura máxima
+            if jogador.rect.bottom >= base_fogo and jogador.rect.top <= altura_dano:
+                if coluna_fogo.can_damage() and not jogador.is_dying:
+                    if jogador.take_damage(1):
+                        coluna_fogo.apply_damage()
     
     # Remove colunas de fogo que saíram da tela
-    for fire_column in list(fire_columns):
-        if fire_column.world_x < camera_x - SCREEN_WIDTH:
-            fire_column.kill()
-        elif fire_column.world_x > camera_x + SCREEN_WIDTH * 2:
-            fire_column.kill()
+    for coluna_fogo in list(colunas_fogo):
+        if coluna_fogo.world_x < camera_x - LARGURA_TELA:
+            coluna_fogo.kill()
+        elif coluna_fogo.world_x > camera_x + LARGURA_TELA * 2:
+            coluna_fogo.kill()
     
     # Remove plataformas que saíram da tela
-    for platform in list(platforms):
-        if platform.world_x < camera_x - SCREEN_WIDTH:
-            platform.kill()
-        elif platform.world_x > camera_x + SCREEN_WIDTH * 2:
-            platform.kill()
+    for plataforma in list(plataformas):
+        if plataforma.world_x < camera_x - LARGURA_TELA:
+            plataforma.kill()
+        elif plataforma.world_x > camera_x + LARGURA_TELA * 2:
+            plataforma.kill()
     
-    # Spawn de novos inimigos (Cyborg ou Careca) - apenas se o player estiver vivo
-    if player.is_alive() and not player.is_dying:
-        spawn_timer += dt
-        if spawn_timer >= spawn_interval:
-            spawn_timer = 0.0
+    # Spawn de novos inimigos (Cyborg ou Careca) - apenas se o jogador estiver vivo
+    if jogador.is_alive() and not jogador.is_dying:
+        temporizador_spawn += delta_tempo
+        if temporizador_spawn >= intervalo_spawn:
+            temporizador_spawn = 0.0
             # Alterna entre spawnar pela direita e esquerda
             lado = random.choice(["direita", "esquerda"])
             # Alterna aleatoriamente entre Cyborg e Careca
             tipo_inimigo = random.choice(["cyborg", "careca"])
             
             # Spawna apenas no chão (inimigos em plataformas são spawnados junto com a plataforma)
-            spawn_y = CHAO_Y
-            spawn_x = camera_x + SCREEN_WIDTH if lado == "direita" else camera_x - SCREEN_WIDTH
-            spawn_on_platform = False
-            chosen_platform = None
+            posicao_y_spawn = CHAO_Y
+            posicao_x_spawn = camera_x + LARGURA_TELA if lado == "direita" else camera_x - LARGURA_TELA
+            spawnar_em_plataforma = False
+            plataforma_escolhida = None
             
             if tipo_inimigo == "careca":
-                novo_inimigo = spawn_careca(spawn_x, spawn_y, SCREEN_WIDTH, player.rect.centery, x_offset=0, lado=lado)
+                novo_inimigo = spawn_careca(posicao_x_spawn, posicao_y_spawn, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado=lado)
             else:
-                novo_inimigo = spawn_inimigo_cyborg(spawn_x, spawn_y, SCREEN_WIDTH, player.rect.centery, x_offset=0, lado=lado)
+                novo_inimigo = spawn_inimigo_cyborg(posicao_x_spawn, posicao_y_spawn, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado=lado)
             
             # Ajusta a posição Y do inimigo se estiver em uma plataforma
-            if spawn_on_platform and chosen_platform:
-                novo_inimigo.rect.bottom = chosen_platform.world_y
-                novo_inimigo.world_x = spawn_x
+            if spawnar_em_plataforma and plataforma_escolhida:
+                novo_inimigo.rect.bottom = plataforma_escolhida.world_y
+                novo_inimigo.world_x = posicao_x_spawn
             
-            enemies.add(novo_inimigo)
+            inimigos.add(novo_inimigo)
     
-    # Spawn de colunas de fogo - apenas se o player estiver vivo
-    if player.is_alive() and not player.is_dying:
-        fire_spawn_timer += dt
-        if fire_spawn_timer >= fire_spawn_interval:
-            fire_spawn_timer = 0.0
-            # Spawna coluna de fogo à frente do player
-            fire_x = camera_x + SCREEN_WIDTH + random.randint(200, 400)
+    # Spawn de colunas de fogo - apenas se o jogador estiver vivo
+    if jogador.is_alive() and not jogador.is_dying:
+        temporizador_spawn_fogo += delta_tempo
+        if temporizador_spawn_fogo >= intervalo_spawn_fogo:
+            temporizador_spawn_fogo = 0.0
+            # Spawna coluna de fogo à frente do jogador
+            posicao_x_fogo = camera_x + LARGURA_TELA + random.randint(200, 400)
             # A coluna será posicionada no chão (o rect.bottom será ajustado no update)
-            fire_y = CHAO_Y
-            fire_column = ColunaFogo(fire_x, fire_y, scale=3.0)  # Aumentado para 3.0
+            posicao_y_fogo = CHAO_Y
+            coluna_fogo = ColunaFogo(posicao_x_fogo, posicao_y_fogo, scale=3.0)  # Aumentado para 3.0
             # Ajusta o bottom da coluna para ficar no chão
-            fire_column.rect.bottom = CHAO_Y
-            fire_column.world_y = CHAO_Y
-            fire_columns.add(fire_column)
+            coluna_fogo.rect.bottom = CHAO_Y
+            coluna_fogo.world_y = CHAO_Y
+            colunas_fogo.add(coluna_fogo)
             
             # Spawna plataforma antes da coluna de fogo
-            platform_width = 200
-            platform_height = 20
-            platform_x = fire_x - platform_width - 50  # 50 pixels antes da coluna
-            platform_y = CHAO_Y - 150  # 150 pixels acima do chão
-            platform = Plataforma(platform_x, platform_y, platform_width, platform_height)
-            platforms.add(platform)
+            largura_plataforma = 200
+            altura_plataforma = 20
+            posicao_x_plataforma = posicao_x_fogo - largura_plataforma - 50  # 50 pixels antes da coluna
+            posicao_y_plataforma = CHAO_Y - 150  # 150 pixels acima do chão
+            plataforma = Plataforma(posicao_x_plataforma, posicao_y_plataforma, largura_plataforma, altura_plataforma)
+            plataformas.add(plataforma)
             
             # Spawna inimigos na plataforma (sempre spawna pelo menos 1, 50% de chance de 2)
             chance_inimigo = random.random()
-            num_inimigos = 1  # Sempre pelo menos 1 inimigo
+            quantidade_inimigos = 1  # Sempre pelo menos 1 inimigo
             if chance_inimigo < 0.5:
-                num_inimigos = 2  # 50% de chance de 2 inimigos
+                quantidade_inimigos = 2  # 50% de chance de 2 inimigos
             
-            for i in range(num_inimigos):
+            for i in range(quantidade_inimigos):
                 # Posiciona inimigo na plataforma com variação
-                enemy_x = platform_x + random.randint(20, platform_width - 20)
-                enemy_y = platform_y  # Topo da plataforma
+                posicao_x_inimigo = posicao_x_plataforma + random.randint(20, largura_plataforma - 20)
+                posicao_y_inimigo = posicao_y_plataforma  # Topo da plataforma
                 
                 # Escolhe tipo de inimigo aleatoriamente
                 tipo_inimigo = random.choice(["cyborg", "careca"])
                 if tipo_inimigo == "careca":
-                    novo_inimigo = spawn_careca(enemy_x, enemy_y, SCREEN_WIDTH, player.rect.centery, x_offset=0, lado="direita")
+                    novo_inimigo = spawn_careca(posicao_x_inimigo, posicao_y_inimigo, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado="direita")
                 else:
-                    novo_inimigo = spawn_inimigo_cyborg(enemy_x, enemy_y, SCREEN_WIDTH, player.rect.centery, x_offset=0, lado="direita")
+                    novo_inimigo = spawn_inimigo_cyborg(posicao_x_inimigo, posicao_y_inimigo, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado="direita")
                 
                 # Ajusta a posição Y para ficar no topo da plataforma
-                novo_inimigo.rect.bottom = platform_y
-                novo_inimigo.world_x = enemy_x
-                enemies.add(novo_inimigo)
+                novo_inimigo.rect.bottom = posicao_y_plataforma
+                novo_inimigo.world_x = posicao_x_inimigo
+                inimigos.add(novo_inimigo)
     
-    # Spawn de corações - apenas se o player estiver vivo e não houver muitos corações na tela
-    if player.is_alive() and not player.is_dying:
-        heart_spawn_timer += dt
-        if heart_spawn_timer >= heart_spawn_interval:
+    # Spawn de corações - apenas se o jogador estiver vivo e não houver muitos corações na tela
+    if jogador.is_alive() and not jogador.is_dying:
+        temporizador_spawn_coracao += delta_tempo
+        if temporizador_spawn_coracao >= intervalo_spawn_coracao:
             # Só spawna se não houver muitos corações na tela
-            if len(hearts) < MAX_HEARTS_ON_SCREEN:
-                heart_spawn_timer = 0.0
-                # Spawna coração mais longe do player (no chão) - à frente da tela visível
-                heart_x = camera_x + random.randint(SCREEN_WIDTH + 200, SCREEN_WIDTH * 2)  # Spawna longe, à frente do player
-                heart = Coracao(heart_x, CHAO_Y, scale=1.0)  # Tamanho fixo de 30x30 pixels
+            if len(coracoes) < MAX_CORACOES_NA_TELA:
+                temporizador_spawn_coracao = 0.0
+                # Spawna coração mais longe do jogador (no chão) - à frente da tela visível
+                posicao_x_coracao = camera_x + random.randint(LARGURA_TELA + 200, LARGURA_TELA * 2)  # Spawna longe, à frente do jogador
+                coracao = Coracao(posicao_x_coracao, CHAO_Y, scale=1.0)  # Tamanho fixo de 30x30 pixels
                 # Ajusta o bottom do coração para ficar no chão
-                heart.world_y = CHAO_Y
+                coracao.world_y = CHAO_Y
                 # Atualiza a posição baseada na câmera (o update vai ajustar o rect)
-                heart.update(0, camera_x)  # Atualiza uma vez para posicionar corretamente
+                coracao.update(0, camera_x)  # Atualiza uma vez para posicionar corretamente
                 # Garante que o bottom está no chão (corrige qualquer problema de posicionamento)
-                heart.rect.bottom = CHAO_Y
-                hearts.add(heart)
+                coracao.rect.bottom = CHAO_Y
+                coracoes.add(coracao)
             else:
                 # Se já há muitos corações, reseta o timer mas não spawna
-                heart_spawn_timer = 0.0
+                temporizador_spawn_coracao = 0.0
     
     # Remove corações que saíram da tela
-    for heart in list(hearts):
-        if heart.world_x < camera_x - SCREEN_WIDTH:  # Remove quando sair da tela à esquerda
-            heart.kill()
-        elif heart.world_x > camera_x + SCREEN_WIDTH * 2:  # Remove quando sair da tela à direita
-            heart.kill()
+    for coracao in list(coracoes):
+        if coracao.world_x < camera_x - LARGURA_TELA:  # Remove quando sair da tela à esquerda
+            coracao.kill()
+        elif coracao.world_x > camera_x + LARGURA_TELA * 2:  # Remove quando sair da tela à direita
+            coracao.kill()
 
     #Desenha fundo e personagem
-    desenhar_parallax(screen, camadas_fundo, camera_x, SCREEN_WIDTH)
+    desenhar_parallax(tela, camadas_fundo, camera_x, LARGURA_TELA)
     
     # Desenha inimigos (incluindo os que estão morrendo)
-    for enemy in enemies:
-        # O enemy.rect já foi atualizado no update() com centerx correto
+    for inimigo in inimigos:
+        # O inimigo.rect já foi atualizado no update() com centerx correto
         # Verifica se o inimigo está dentro da área visível da tela usando centerx
-        enemy_screen_centerx = enemy.rect.centerx
+        centro_x_tela_inimigo = inimigo.rect.centerx
         
         # Verifica se o inimigo está dentro da área visível da tela
-        if -100 <= enemy_screen_centerx <= SCREEN_WIDTH + 100:  # Margem de 100px
+        if -100 <= centro_x_tela_inimigo <= LARGURA_TELA + 100:  # Margem de 100px
             # Usa o rect diretamente que já está correto (centerx já foi atualizado)
-            screen.blit(enemy.image, enemy.rect)
+            tela.blit(inimigo.image, inimigo.rect)
     
     # Desenha protagonista (com efeito de piscar mais rápido quando sofre dano)
-    if player.is_dying:
+    if jogador.is_dying:
         # Quando morto, mostra a animação de morte sem piscar
-        screen.blit(player.image, player.rect)
-    elif player.invincibility_timer > 0:
+        tela.blit(jogador.image, jogador.rect)
+    elif jogador.invincibility_timer > 0:
         # Pisca o personagem rapidamente quando invencível (animação de dano mais rápida)
         # Multiplicador maior = piscar mais rápido (75 cria um efeito 1.5x mais rápido)
-        visible = math.sin(player.invincibility_timer * 75) > 0
-        if visible:
-            screen.blit(player.image, player.rect)
+        visivel = math.sin(jogador.invincibility_timer * 75) > 0
+        if visivel:
+            tela.blit(jogador.image, jogador.rect)
     else:
-        screen.blit(player.image, player.rect)
+        tela.blit(jogador.image, jogador.rect)
     
     # Desenha projéteis
-    bullets.draw(screen)  # Projéteis do protagonista
-    enemy_bullets.draw(screen)  # Projéteis dos inimigos
+    projeteis.draw(tela)  # Projéteis do protagonista
+    projeteis_inimigos.draw(tela)  # Projéteis dos inimigos
     
     # Desenha plataformas
-    for platform in platforms:
+    for plataforma in plataformas:
         # Verifica se a plataforma está dentro da área visível da tela
-        if -100 <= platform.rect.centerx <= SCREEN_WIDTH + 200:
-            screen.blit(platform.image, platform.rect)
+        if -100 <= plataforma.rect.centerx <= LARGURA_TELA + 200:
+            tela.blit(plataforma.image, plataforma.rect)
     
     # Desenha colunas de fogo
-    for fire_column in fire_columns:
+    for coluna_fogo in colunas_fogo:
         # Verifica se a coluna está dentro da área visível da tela
-        if -100 <= fire_column.rect.centerx <= SCREEN_WIDTH + 100:
-            screen.blit(fire_column.image, fire_column.rect)
+        if -100 <= coluna_fogo.rect.centerx <= LARGURA_TELA + 100:
+            tela.blit(coluna_fogo.image, coluna_fogo.rect)
     
     # Desenha corações
-    for heart in hearts:
+    for coracao in coracoes:
         # Verifica se o coração está dentro da área visível da tela
-        if -50 <= heart.rect.centerx <= SCREEN_WIDTH + 50:  # Margem de 50px
-            screen.blit(heart.image, heart.rect)
+        if -50 <= coracao.rect.centerx <= LARGURA_TELA + 50:  # Margem de 50px
+            tela.blit(coracao.image, coracao.rect)
     
     # Desenha corações de vida por último para ficar sempre visível
-    desenhar_coracoes_vida(screen, player, x=20, y=20, heart_size=30)
+    desenhar_coracoes_vida(tela, jogador, x=20, y=20, tamanho_coracao=30)
 
     pygame.display.flip()
-    screen.fill((0, 0, 0))
+    tela.fill((0, 0, 0))
 
 pygame.quit()

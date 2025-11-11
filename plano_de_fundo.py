@@ -9,8 +9,7 @@ def carregar_camadas(screen_height):
         caminho = os.path.normpath(caminho)
         try:
             img = pygame.image.load(caminho).convert_alpha()
-        except Exception as e:
-            print(f"Erro ao carregar camada {caminho}: {e}")
+        except Exception:
             img = pygame.Surface((800, 600), pygame.SRCALPHA)
             img.fill((30, 30, 30))
 

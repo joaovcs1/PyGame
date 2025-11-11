@@ -9,17 +9,17 @@ class Protagonista(pygame.sprite.Sprite):
         super().__init__()
         self.scale = float(scale) if scale >= 0.5 else 0.5
 
-        self.idle_frames = self._load_frames(idle_path, idle_count, self.scale)
-        self.run_frames = self._load_frames(run_path, run_count, self.scale)
-        self.jump_frames = self._load_frames(jump_path, jump_count, self.scale)
-        self.double_frames = self._load_frames(double_path, double_count, self.scale)
+        self.idle_frames = self._carregar_quadros(idle_path, idle_count, self.scale)
+        self.run_frames = self._carregar_quadros(run_path, run_count, self.scale)
+        self.jump_frames = self._carregar_quadros(jump_path, jump_count, self.scale)
+        self.double_frames = self._carregar_quadros(double_path, double_count, self.scale)
         # animação de tiro (4 frames por padrão)
-        self.shot_frames = self._load_frames(shot_path, 4, self.scale)
+        self.shot_frames = self._carregar_quadros(shot_path, 4, self.scale)
         # animação de morte
-        self.death_frames = self._load_frames(death_path, None, self.scale)
+        self.death_frames = self._carregar_quadros(death_path, None, self.scale)
 
         # estado de animação
-        self.current_frames = self.idle_frames if self.idle_frames else [self._fallback_surface(self.scale)]
+        self.current_frames = self.idle_frames if self.idle_frames else [self._superficie_fallback(self.scale)]
         self.frame_index = 0
         self.animation_timer = 0.0
         self.animation_speed = 0.12
@@ -55,86 +55,83 @@ class Protagonista(pygame.sprite.Sprite):
         self.dead_last_frame_duration = 2.0  # 2 segundos no último frame
 
 
-    def _fallback_surface(self, scale=1):
-        s = pygame.Surface((32*scale, 48*scale), pygame.SRCALPHA)
-        s.fill((200,80,40))
-        return s
+    def _superficie_fallback(self, escala=1):
+        superficie = pygame.Surface((32*escala, 48*escala), pygame.SRCALPHA)
+        superficie.fill((200,80,40))
+        return superficie
 
-    def _detectar_num_frames(self, sheet, frame_width_hint=None):
+    def _detectar_numero_quadros(self, folha, dica_largura_quadro=None):
         """Detecta automaticamente o número de frames em um sprite sheet"""
-        sheet_w, sheet_h = sheet.get_width(), sheet.get_height()
+        largura_folha, altura_folha = folha.get_width(), folha.get_height()
         
-        if frame_width_hint:
-            num_frames = sheet_w // frame_width_hint
-            if num_frames > 0 and (num_frames * frame_width_hint) == sheet_w:
-                return num_frames, frame_width_hint
+        if dica_largura_quadro:
+            numero_quadros = largura_folha // dica_largura_quadro
+            if numero_quadros > 0 and (numero_quadros * dica_largura_quadro) == largura_folha:
+                return numero_quadros, dica_largura_quadro
         
         larguras_comuns = [256, 192, 144, 128, 112, 96, 80, 64, 48, 32]
         
         melhor_opcao = None
-        melhor_score = 0
+        melhor_pontuacao = 0
         
         for largura in larguras_comuns:
-            if sheet_w % largura == 0:
-                num_frames = sheet_w // largura
-                if num_frames > 0:
-                    if 4 <= num_frames <= 20:
-                        return num_frames, largura
-                    if melhor_opcao is None or (melhor_score < num_frames <= 20):
-                        melhor_opcao = (num_frames, largura)
-                        melhor_score = num_frames
+            if largura_folha % largura == 0:
+                numero_quadros = largura_folha // largura
+                if numero_quadros > 0:
+                    if 4 <= numero_quadros <= 20:
+                        return numero_quadros, largura
+                    if melhor_opcao is None or (melhor_pontuacao < numero_quadros <= 20):
+                        melhor_opcao = (numero_quadros, largura)
+                        melhor_pontuacao = numero_quadros
         
         if melhor_opcao:
             return melhor_opcao
         
         largura = 32
-        while largura <= sheet_w:
-            if sheet_w % largura == 0:
-                num_frames = sheet_w // largura
-                if num_frames > 0 and num_frames <= 30:
-                    return num_frames, largura
+        while largura <= largura_folha:
+            if largura_folha % largura == 0:
+                numero_quadros = largura_folha // largura
+                if numero_quadros > 0 and numero_quadros <= 30:
+                    return numero_quadros, largura
             largura *= 2
         
-        return 1, sheet_w
+        return 1, largura_folha
 
-    def _load_frames(self, caminho, num_frames, scale):
+    def _carregar_quadros(self, caminho, numero_quadros, escala):
         caminho = os.path.normpath(caminho)
         try:
-            sheet = pygame.image.load(caminho).convert_alpha()
-        except Exception as e:
-            print(f"[Protagonista] Aviso: não foi possível carregar '{caminho}': {e}")
-            return [self._fallback_surface(scale)]
+            folha = pygame.image.load(caminho).convert_alpha()
+        except Exception:
+            return [self._superficie_fallback(escala)]
 
-        sheet_w, sheet_h = sheet.get_width(), sheet.get_height()
+        largura_folha, altura_folha = folha.get_width(), folha.get_height()
         
-        # Se num_frames é None, detecta automaticamente
-        if num_frames is None or num_frames <= 0:
-            num_frames, frame_w = self._detectar_num_frames(sheet)
-            print(f"[Protagonista] Detectados {num_frames} frames em '{os.path.basename(caminho)}' (largura: {frame_w}px)")
+        # Se numero_quadros é None, detecta automaticamente
+        if numero_quadros is None or numero_quadros <= 0:
+            numero_quadros, largura_quadro = self._detectar_numero_quadros(folha)
         else:
-            frame_w = sheet_w // num_frames
+            largura_quadro = largura_folha // numero_quadros
         
-        frames = []
-        for i in range(num_frames):
-            rect = pygame.Rect(i * frame_w, 0, frame_w, sheet_h)
+        quadros = []
+        for i in range(numero_quadros):
+            rect = pygame.Rect(i * largura_quadro, 0, largura_quadro, altura_folha)
             try:
-                frame = sheet.subsurface(rect).copy()
+                quadro = folha.subsurface(rect).copy()
                 # redimensiona usando escala fracionária
-                new_w = max(1, int(round(frame.get_width() * self.scale)))
-                new_h = max(1, int(round(frame.get_height() * self.scale)))
-                frame = pygame.transform.scale(frame, (new_w, new_h))
-                frames.append(frame)
-            except Exception as e:
-                print(f"[Protagonista] Erro ao extrair frame {i}: {e}")
-                frames.append(self._fallback_surface(scale))
+                nova_largura = max(1, int(round(quadro.get_width() * self.scale)))
+                nova_altura = max(1, int(round(quadro.get_height() * self.scale)))
+                quadro = pygame.transform.scale(quadro, (nova_largura, nova_altura))
+                quadros.append(quadro)
+            except Exception:
+                quadros.append(self._superficie_fallback(escala))
         
-        return frames if frames else [self._fallback_surface(scale)]
+        return quadros if quadros else [self._superficie_fallback(escala)]
 
-    def move(self, dx):
-        if dx == 0:
+    def move(self, delta_x):
+        if delta_x == 0:
             return
-        self.facing = "right" if dx > 0 else "left"
-        self.rect.x += int(dx)
+        self.facing = "right" if delta_x > 0 else "left"
+        self.rect.x += int(delta_x)
 
     def jump(self):
         # Não pode pular se estiver morrendo
@@ -169,97 +166,97 @@ class Protagonista(pygame.sprite.Sprite):
         else:
             self.no_chao = False
 
-    def update(self, dt, moving=False):
+    def update(self, delta_tempo, moving=False):
         # Se está morrendo, atualiza animação de morte
         if self.is_dying:
-            self._update_death_animation(dt)
+            self._atualizar_animacao_morte(delta_tempo)
             return
         
         # Atualiza timer de invencibilidade
         if self.invincibility_timer > 0:
-            self.invincibility_timer = max(0.0, self.invincibility_timer - dt)
+            self.invincibility_timer = max(0.0, self.invincibility_timer - delta_tempo)
         
         # escolhe frames por estado (prioridade: ar -> run -> idle)
         if self.shot_timer > 0:
-            self.shot_timer = max(0.0, self.shot_timer - dt)
-            frames = self.shot_frames if self.shot_frames else self.idle_frames
-            frame_time = max(0.06, self.animation_speed * 0.8)
+            self.shot_timer = max(0.0, self.shot_timer - delta_tempo)
+            quadros = self.shot_frames if self.shot_frames else self.idle_frames
+            tempo_quadro = max(0.06, self.animation_speed * 0.8)
         elif not self.no_chao:
-            frames = self.double_frames if (self.used_double and self.double_frames) else self.jump_frames
-            frame_time = self.animation_speed
+            quadros = self.double_frames if (self.used_double and self.double_frames) else self.jump_frames
+            tempo_quadro = self.animation_speed
         else:
-            frames = self.run_frames if (moving and self.run_frames) else self.idle_frames
-            frame_time = self.animation_speed
+            quadros = self.run_frames if (moving and self.run_frames) else self.idle_frames
+            tempo_quadro = self.animation_speed
 
         # animação por tempo
-        self.animation_timer += dt
-        if self.animation_timer >= frame_time:
-            passos = int(self.animation_timer / frame_time)
-            self.animation_timer -= passos * frame_time
-            self.frame_index = (self.frame_index + passos) % len(frames)
+        self.animation_timer += delta_tempo
+        if self.animation_timer >= tempo_quadro:
+            passos = int(self.animation_timer / tempo_quadro)
+            self.animation_timer -= passos * tempo_quadro
+            self.frame_index = (self.frame_index + passos) % len(quadros)
 
             # preserva posição vertical (bottom) e centerx ao trocar frame
-            prev_centerx = self.rect.centerx
-            prev_bottom = self.rect.bottom
+            centro_x_anterior = self.rect.centerx
+            base_anterior = self.rect.bottom
 
-            frame = frames[self.frame_index]
+            quadro = quadros[self.frame_index]
             if self.facing == "left":
-                frame = pygame.transform.flip(frame, True, False)
+                quadro = pygame.transform.flip(quadro, True, False)
 
-            self.image = frame
+            self.image = quadro
             self.rect = self.image.get_rect()
-            self.rect.centerx = prev_centerx
-            self.rect.bottom = prev_bottom
+            self.rect.centerx = centro_x_anterior
+            self.rect.bottom = base_anterior
     
-    def _update_death_animation(self, dt):
+    def _atualizar_animacao_morte(self, delta_tempo):
         """Atualiza a animação de morte do protagonista"""
         if not self.death_frames or len(self.death_frames) == 0:
             # Se não há animação de morte, usa idle
-            frames = self.idle_frames if self.idle_frames else [self._fallback_surface(self.scale)]
-            frame = frames[0] if frames else self._fallback_surface(self.scale)
+            quadros = self.idle_frames if self.idle_frames else [self._superficie_fallback(self.scale)]
+            quadro = quadros[0] if quadros else self._superficie_fallback(self.scale)
             if self.facing == "left":
-                frame = pygame.transform.flip(frame, True, False)
-            self.image = frame
+                quadro = pygame.transform.flip(quadro, True, False)
+            self.image = quadro
             return
         
-        total_frames = len(self.death_frames)
-        last_frame_index = total_frames - 1
+        total_quadros = len(self.death_frames)
+        indice_ultimo_quadro = total_quadros - 1
         
-        if self.frame_index == last_frame_index:
+        if self.frame_index == indice_ultimo_quadro:
             # Está no último frame, mantém por dead_last_frame_duration
-            self.dead_timer += dt
-            frame = self.death_frames[last_frame_index]
+            self.dead_timer += delta_tempo
+            quadro = self.death_frames[indice_ultimo_quadro]
         else:
             # Avança para o próximo frame
-            self.animation_timer += dt
-            frame_time = self.animation_speed
+            self.animation_timer += delta_tempo
+            tempo_quadro = self.animation_speed
             
-            if self.animation_timer >= frame_time:
-                passos = int(self.animation_timer / frame_time)
-                self.animation_timer -= passos * frame_time
-                self.frame_index = min(self.frame_index + passos, last_frame_index)
-                frame = self.death_frames[self.frame_index]
+            if self.animation_timer >= tempo_quadro:
+                passos = int(self.animation_timer / tempo_quadro)
+                self.animation_timer -= passos * tempo_quadro
+                self.frame_index = min(self.frame_index + passos, indice_ultimo_quadro)
+                quadro = self.death_frames[self.frame_index]
             else:
-                frame = self.death_frames[self.frame_index]
+                quadro = self.death_frames[self.frame_index]
         
         # Preserva posições antes de recriar o rect
-        prev_centerx = self.rect.centerx
-        prev_bottom = self.rect.bottom
+        centro_x_anterior = self.rect.centerx
+        base_anterior = self.rect.bottom
         
         if self.facing == "left":
-            frame = pygame.transform.flip(frame, True, False)
+            quadro = pygame.transform.flip(quadro, True, False)
         
-        self.image = frame
+        self.image = quadro
         self.rect = self.image.get_rect()
-        self.rect.centerx = prev_centerx
-        self.rect.bottom = prev_bottom
+        self.rect.centerx = centro_x_anterior
+        self.rect.bottom = base_anterior
     
-    def take_damage(self, damage=1):
+    def take_damage(self, dano=1):
         """Recebe dano do inimigo. Retorna True se o dano foi aplicado."""
         if self.invincibility_timer > 0 or self.is_dying:
             return False  # Ainda está invencível ou já está morrendo
         
-        self.health = max(0, self.health - damage)
+        self.health = max(0, self.health - dano)
         
         # Se a vida chegou a zero, inicia animação de morte
         if self.health <= 0:
@@ -281,14 +278,14 @@ class Protagonista(pygame.sprite.Sprite):
         """Retorna a porcentagem de vida (0.0 a 1.0)"""
         return max(0.0, float(self.health) / float(self.max_health))
     
-    def heal(self, amount=1):
+    def heal(self, quantidade=1):
         """Restaura vida do player"""
         if self.is_dying:
             return False  # Não pode curar se está morrendo
         
-        old_health = self.health
-        self.health = min(self.max_health, self.health + amount)
-        return self.health > old_health  # Retorna True se curou
+        vida_anterior = self.health
+        self.health = min(self.max_health, self.health + quantidade)
+        return self.health > vida_anterior  # Retorna True se curou
  
     def shoot(self):
         """Dispara um projétil e aciona a animação de tiro. Retorna o sprite do projétil."""
@@ -299,34 +296,34 @@ class Protagonista(pygame.sprite.Sprite):
         self.shot_timer = self.shot_duration
 
         # ponto de origem aproximado do cano da arma
-        img = self.image
+        imagem = self.image
         if self.facing == "right":
-            muzzle_x = self.rect.centerx + img.get_width() // 8
+            posicao_x_cano = self.rect.centerx + imagem.get_width() // 8
         else:
-            muzzle_x = self.rect.centerx - img.get_width() // 8
+            posicao_x_cano = self.rect.centerx - imagem.get_width() // 8
         # altura do projétil acompanha a posição Y atual do personagem (arma fica aproximadamente no centery)
-        muzzle_y = (self.rect.centery - img.get_height() // 10)+53
-        direction = 1 if self.facing == "right" else -1
-        speed = 12
-        return Projetil(muzzle_x, muzzle_y, direction, speed, self.scale)
+        posicao_y_cano = (self.rect.centery - imagem.get_height() // 10)+53
+        direcao = 1 if self.facing == "right" else -1
+        velocidade = 12
+        return Projetil(posicao_x_cano, posicao_y_cano, direcao, velocidade, self.scale)
 
 
 class Projetil(pygame.sprite.Sprite):
-    def __init__(self, x, y, direction, speed, scale=1.0):
+    def __init__(self, x, y, direcao, velocidade, escala=1.0):
         super().__init__()
         try:
-            img = pygame.image.load(bullet_path).convert_alpha()
+            imagem = pygame.image.load(bullet_path).convert_alpha()
         except Exception:
             # fallback simples
-            img = pygame.Surface((6, 2), pygame.SRCALPHA)
-            img.fill((255, 200, 40))
+            imagem = pygame.Surface((6, 2), pygame.SRCALPHA)
+            imagem.fill((255, 200, 40))
 
-        new_w = max(1, int(round(img.get_width() * scale)))
-        new_h = max(1, int(round(img.get_height() * scale)))
-        self.image = pygame.transform.scale(img, (new_w, new_h))
+        nova_largura = max(1, int(round(imagem.get_width() * escala)))
+        nova_altura = max(1, int(round(imagem.get_height() * escala)))
+        self.image = pygame.transform.scale(imagem, (nova_largura, nova_altura))
         self.rect = self.image.get_rect(center=(x, y))
-        self.direction = 1 if direction >= 0 else -1
-        self.speed = speed
+        self.direction = 1 if direcao >= 0 else -1
+        self.speed = velocidade
 
-    def update(self, dt):
+    def update(self, delta_tempo):
         self.rect.x += int(self.direction * self.speed)

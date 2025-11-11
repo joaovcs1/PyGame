@@ -508,36 +508,48 @@ while rodando:
         # --- Sistema de Inimigos ---
         # Atualiza inimigos PRIMEIRO para ter rects atualizados
         for inimigo in inimigos:
-            # Aplica gravidade e verifica colisão com plataformas
-            inimigo.vel_y += inimigo.gravidade
-            inimigo.rect.y += int(inimigo.vel_y)
+            # CRÍTICO: NÃO aplica física se o inimigo está morrendo
+            # Isso garante que a posição seja preservada quando o inimigo morre
+            if not inimigo.is_dying:
+                # Aplica gravidade e verifica colisão com plataformas
+                inimigo.vel_y += inimigo.gravidade
+                inimigo.rect.y += int(inimigo.vel_y)
+                
+                # Verifica colisão com plataformas
+                inimigo_em_plataforma = False
+                for plataforma in plataformas:
+                    if inimigo.rect.colliderect(plataforma.rect):
+                        # Verifica se o inimigo está em cima da plataforma
+                        base_inimigo = inimigo.rect.bottom
+                        topo_plataforma = plataforma.world_y
+                        # Tolerância para detectar quando está em cima
+                        if base_inimigo >= topo_plataforma - 10 and base_inimigo <= topo_plataforma + 15:
+                            # Se está caindo ou parado, coloca em cima da plataforma
+                            if inimigo.vel_y >= 0:
+                                inimigo.rect.bottom = topo_plataforma
+                                inimigo.vel_y = 0.0
+                                inimigo_em_plataforma = True
+                                inimigo.no_chao = True
+                                break
+                
+                # Se não está em plataforma, verifica chão
+                if not inimigo_em_plataforma:
+                    if inimigo.rect.bottom >= CHAO_Y:
+                        inimigo.rect.bottom = CHAO_Y
+                        inimigo.vel_y = 0.0
+                        inimigo.no_chao = True
+                    else:
+                        inimigo.no_chao = False
             
-            # Verifica colisão com plataformas
-            inimigo_em_plataforma = False
-            for plataforma in plataformas:
-                if inimigo.rect.colliderect(plataforma.rect):
-                    # Verifica se o inimigo está em cima da plataforma
-                    base_inimigo = inimigo.rect.bottom
-                    topo_plataforma = plataforma.world_y
-                    # Tolerância para detectar quando está em cima
-                    if base_inimigo >= topo_plataforma - 10 and base_inimigo <= topo_plataforma + 15:
-                        # Se está caindo ou parado, coloca em cima da plataforma
-                        if inimigo.vel_y >= 0:
-                            inimigo.rect.bottom = topo_plataforma
-                            inimigo.vel_y = 0.0
-                            inimigo_em_plataforma = True
-                            inimigo.no_chao = True
-                            break
+            # Careca: verifica se deve atirar ANTES de atualizar (para que shot_timer seja definido e a animação apareça no mesmo frame)
+            if isinstance(inimigo, Careca):
+                if inimigo.alive and not inimigo.is_dying and not jogador.is_dying:
+                    if inimigo.pode_atirar(posicao_mundo_x_jogador, posicao_mundo_y_jogador):
+                        projetil = inimigo.shoot(posicao_mundo_x_jogador, posicao_mundo_y_jogador)
+                        if projetil:
+                            projeteis_inimigos.add(projetil)
             
-            # Se não está em plataforma, verifica chão
-            if not inimigo_em_plataforma:
-                if inimigo.rect.bottom >= CHAO_Y:
-                    inimigo.rect.bottom = CHAO_Y
-                    inimigo.vel_y = 0.0
-                    inimigo.no_chao = True
-                else:
-                    inimigo.no_chao = False
-            
+            # Atualiza o inimigo (agora com shot_timer já definido se o Careca atirou)
             inimigo.update(delta_tempo, camera_x, (posicao_mundo_x_jogador, posicao_mundo_y_jogador))
             
             # Cyborg soca quando perto - só causa dano se o jogador estiver vivo
@@ -548,14 +560,6 @@ while rodando:
                     if inimigo.rect.colliderect(jogador.rect) and not jogador.is_dying:
                         # Aplica dano ao jogador (com cooldown de invencibilidade)
                         jogador.take_damage(1)
-            
-            # Careca atira quando detecta o jogador
-            elif isinstance(inimigo, Careca):
-                if inimigo.alive and not inimigo.is_dying and not jogador.is_dying:
-                    if inimigo.pode_atirar(posicao_mundo_x_jogador, posicao_mundo_y_jogador):
-                        projetil = inimigo.shoot(posicao_mundo_x_jogador, posicao_mundo_y_jogador)
-                        if projetil:
-                            projeteis_inimigos.add(projetil)
         
         # --- Colisões de projéteis do jogador com inimigos ---
         # Verifica colisões DEPOIS de atualizar inimigos para ter rects corretos

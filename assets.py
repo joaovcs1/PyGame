@@ -23,8 +23,8 @@ caminhos = [
 
 #inimigo careca
 base_2 = os.path.normpath("assets/Imagens/inimigo1")
-idle_careca = os.path.join(base_2,"Idle_2.png")
-shot_careca = os.path.join(base_2,"Shot.png")  # Sprite sheet com 8 frames (frames 0-2,7 são idle, frames 3-6 são shot)
+idle_careca = os.path.join(base_2,"Idle_2.png")  # Sprite sheet com 7 frames
+shot_careca = os.path.join(base_2,"Shot.png")  # Sprite sheet com 11 frames
 run_careca = os.path.join(base_2,"Run.png")
 dead_careca = os.path.join(base_2,"Dead.png")
 

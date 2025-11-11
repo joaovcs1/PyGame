@@ -112,11 +112,29 @@ class InimigoCyborg(pygame.sprite.Sprite):
             numero_quadros, largura_quadro = self._detectar_numero_quadros(folha, frame_width_hint)
         else:
             numero_quadros = num_frames
-            largura_quadro = largura_folha // numero_quadros
+            # Calcula a largura exata de cada frame
+            # Se não divide exatamente, ajusta para garantir que todos os frames sejam extraídos
+            if largura_folha % numero_quadros == 0:
+                largura_quadro = largura_folha // numero_quadros
+            else:
+                # Se não divide exatamente, usa divisão inteira e ajusta o último frame
+                largura_quadro = largura_folha // numero_quadros
         
         quadros = []
         for i in range(numero_quadros):
-            rect = pygame.Rect(i * largura_quadro, 0, largura_quadro, altura_folha)
+            # Calcula a posição X exata de cada frame
+            x_inicio = i * largura_quadro
+            # Para o último frame, usa o resto da largura para evitar perder pixels
+            if i == numero_quadros - 1:
+                largura_atual = largura_folha - x_inicio
+            else:
+                largura_atual = largura_quadro
+            
+            # Garante que não ultrapasse os limites
+            if x_inicio >= largura_folha or largura_atual <= 0:
+                break
+                
+            rect = pygame.Rect(x_inicio, 0, largura_atual, altura_folha)
             try:
                 quadro = folha.subsurface(rect).copy()
                 nova_largura = max(1, int(round(quadro.get_width() * scale)))
@@ -411,30 +429,93 @@ class Careca(pygame.sprite.Sprite):
         self.scale = float(scale) if scale >= 0.5 else 0.5
         
         # Carrega animações do Careca
+        # Idle_2.png tem 7 frames - força isso para garantir detecção correta
+        if idle_count is None:
+            idle_count = 7  # Idle_2.png tem exatamente 7 frames
         self.idle_frames = self._load_frames(idle_careca, idle_count, self.scale)
+        # Garante que tem exatamente 7 frames (remove duplicatas se houver)
+        if len(self.idle_frames) > 7:
+            self.idle_frames = self.idle_frames[:7]
+        elif len(self.idle_frames) < 7 and len(self.idle_frames) > 0:
+            # Se tiver menos de 7, completa com o último frame
+            while len(self.idle_frames) < 7:
+                self.idle_frames.append(self.idle_frames[-1].copy())
+        # Shot.png tem 12 frames - força isso para garantir detecção correta
+        if shot_count is None:
+            shot_count = 12  # Shot.png tem exatamente 12 frames
         self.shot_frames = self._load_frames(shot_careca, shot_count, self.scale)
+        # Garante que shot_frames tem exatamente o número esperado de frames
+        if len(self.shot_frames) > shot_count:
+            self.shot_frames = self.shot_frames[:shot_count]
+        elif len(self.shot_frames) < shot_count and len(self.shot_frames) > 0:
+            # Se tiver menos frames, completa com o último frame
+            while len(self.shot_frames) < shot_count:
+                self.shot_frames.append(self.shot_frames[-1].copy())
+        
         self.dead_frames = self._load_frames(dead_careca, None, self.scale)  # Detecta automaticamente
         
+        # CRÍTICO: Normaliza TODAS as animações com as MESMAS dimensões máximas
+        # Isso garante que idle, shot e dead tenham exatamente o mesmo tamanho
+        # evitando movimento visual quando muda de animação
+        todas_animacoes = []
+        if self.idle_frames:
+            todas_animacoes.extend(self.idle_frames)
+        if self.shot_frames:
+            todas_animacoes.extend(self.shot_frames)
+        if self.dead_frames:
+            todas_animacoes.extend(self.dead_frames)
+        
+        # Encontra a largura e altura máxima entre TODAS as animações
+        if todas_animacoes:
+            largura_maxima_global = max(frame.get_width() for frame in todas_animacoes)
+            altura_maxima_global = max(frame.get_height() for frame in todas_animacoes)
+        else:
+            # Fallback se não houver frames
+            largura_maxima_global = 32
+            altura_maxima_global = 32
+        
+        # Normaliza cada animação usando as dimensões máximas globais
+        self.idle_frames = self._normalizar_frames_com_dimensoes(self.idle_frames, largura_maxima_global, altura_maxima_global)
+        self.shot_frames = self._normalizar_frames_com_dimensoes(self.shot_frames, largura_maxima_global, altura_maxima_global)
+        self.dead_frames = self._normalizar_frames_com_dimensoes(self.dead_frames, largura_maxima_global, altura_maxima_global)
+        
+        # Validação: garante que os frames foram carregados corretamente
+        if len(self.idle_frames) == 0:
+            print(f"AVISO: Nenhum frame idle foi carregado para Careca!")
+            self.idle_frames = [self._superficie_fallback(self.scale)]
+        if len(self.shot_frames) == 0:
+            print(f"AVISO: Nenhum frame shot foi carregado para Careca! Usando idle como fallback.")
+            self.shot_frames = self.idle_frames.copy() if len(self.idle_frames) > 0 else [self._superficie_fallback(self.scale)]
+        
         # Estado de animação
-        self.current_frames = self.idle_frames if self.idle_frames else [self._superficie_fallback(self.scale)]
+        # CRÍTICO: Sempre usa shot_frames (nunca muda para idle)
+        self.current_frames = self.shot_frames if self.shot_frames else (self.idle_frames if self.idle_frames else [self._superficie_fallback(self.scale)])
         self.frame_index = 0
         self.animation_timer = 0.0
         self.animation_speed = 0.12
         self.shot_timer = 0.0
-        self.shot_duration = 0.3  # Duração do tiro
+        self.shot_duration = 1.0  # Duração do tiro (aumentado para mostrar a animação completa)
+        self._ultimos_quadros = self.shot_frames if self.shot_frames else self.idle_frames  # Sempre shot_frames
         
         # Estado de morte
         self.is_dying = False
         self.dead_timer = 0.0
         self.dead_last_frame_duration = 2.0  # 2 segundos no último frame
         self._was_dying = False  # Flag para detectar quando acabou de morrer
-        
-        self.image = self.current_frames[self.frame_index]
-        self.rect = self.image.get_rect(center=(x, y))
+        self._death_base_y = None  # Posição Y preservada quando morre
         
         # Movimento e direção - fica parado
         self.speed = 0.0  # Não se move
         self.facing = "left"  # Inimigos começam olhando para esquerda por padrão
+        
+        # Inicializa a imagem corretamente com flip se necessário
+        # CRÍTICO: Usa shot_frames como padrão (nunca idle)
+        quadro_inicial = self.shot_frames[0] if self.shot_frames else (self.idle_frames[0] if self.idle_frames else self._superficie_fallback(self.scale))
+        quadro_inicial = quadro_inicial.copy()
+        if self.facing == "left":
+            quadro_inicial = pygame.transform.flip(quadro_inicial, True, False)
+        self.image = quadro_inicial
+        self.rect = self.image.get_rect(center=(x, y))
         
         # Física vertical
         self.vel_y = 0.0
@@ -510,11 +591,29 @@ class Careca(pygame.sprite.Sprite):
             numero_quadros, largura_quadro = self._detectar_numero_quadros(folha, frame_width_hint)
         else:
             numero_quadros = num_frames
-            largura_quadro = largura_folha // numero_quadros
+            # Calcula a largura exata de cada frame
+            # Se não divide exatamente, ajusta para garantir que todos os frames sejam extraídos
+            if largura_folha % numero_quadros == 0:
+                largura_quadro = largura_folha // numero_quadros
+            else:
+                # Se não divide exatamente, usa divisão inteira e ajusta o último frame
+                largura_quadro = largura_folha // numero_quadros
         
         quadros = []
         for i in range(numero_quadros):
-            rect = pygame.Rect(i * largura_quadro, 0, largura_quadro, altura_folha)
+            # Calcula a posição X exata de cada frame
+            x_inicio = i * largura_quadro
+            # Para o último frame, usa o resto da largura para evitar perder pixels
+            if i == numero_quadros - 1:
+                largura_atual = largura_folha - x_inicio
+            else:
+                largura_atual = largura_quadro
+            
+            # Garante que não ultrapasse os limites
+            if x_inicio >= largura_folha or largura_atual <= 0:
+                break
+                
+            rect = pygame.Rect(x_inicio, 0, largura_atual, altura_folha)
             try:
                 quadro = folha.subsurface(rect).copy()
                 nova_largura = max(1, int(round(quadro.get_width() * scale)))
@@ -535,6 +634,54 @@ class Careca(pygame.sprite.Sprite):
             self.no_chao = True
         else:
             self.no_chao = False
+    
+    def _normalizar_largura_frames(self, frames):
+        """Garante que todos os frames tenham a mesma largura e altura para evitar movimento durante animação"""
+        if not frames or len(frames) == 0:
+            return frames
+        
+        # Encontra a largura e altura máxima de todos os frames
+        largura_maxima = max(frame.get_width() for frame in frames)
+        altura_maxima = max(frame.get_height() for frame in frames)
+        
+        # Redimensiona todos os frames para terem exatamente a mesma largura e altura
+        frames_normalizados = []
+        for frame in frames:
+            # Cria uma nova superfície com a largura e altura máximas (transparente)
+            frame_normalizado = pygame.Surface((largura_maxima, altura_maxima), pygame.SRCALPHA)
+            
+            # Calcula a posição X e Y para centralizar o frame original
+            offset_x = (largura_maxima - frame.get_width()) // 2
+            offset_y = (altura_maxima - frame.get_height()) // 2
+            
+            # Copia o frame original para a superfície normalizada, centralizado
+            frame_normalizado.blit(frame, (offset_x, offset_y))
+            
+            frames_normalizados.append(frame_normalizado)
+        
+        return frames_normalizados
+    
+    def _normalizar_frames_com_dimensoes(self, frames, largura_maxima, altura_maxima):
+        """Normaliza frames usando dimensões pré-definidas (garante que todas as animações tenham o mesmo tamanho)"""
+        if not frames or len(frames) == 0:
+            return frames
+        
+        # Redimensiona todos os frames para terem exatamente a mesma largura e altura
+        frames_normalizados = []
+        for frame in frames:
+            # Cria uma nova superfície com a largura e altura máximas (transparente)
+            frame_normalizado = pygame.Surface((largura_maxima, altura_maxima), pygame.SRCALPHA)
+            
+            # Calcula a posição X e Y para centralizar o frame original
+            offset_x = (largura_maxima - frame.get_width()) // 2
+            offset_y = (altura_maxima - frame.get_height()) // 2
+            
+            # Copia o frame original para a superfície normalizada, centralizado
+            frame_normalizado.blit(frame, (offset_x, offset_y))
+            
+            frames_normalizados.append(frame_normalizado)
+        
+        return frames_normalizados
     
     def calcular_distancia(self, alvo_x, alvo_y):
         """Calcula a distância até o alvo"""
@@ -582,8 +729,21 @@ class Careca(pygame.sprite.Sprite):
         direcao_y = 0
         
         # Ponto de origem do projétil na tela
-        posicao_x_cano = self.rect.centerx
-        posicao_y_cano = self.rect.centery
+        # A arma está próxima ao centro horizontal do sprite, com um pequeno offset na direção do tiro
+        # Usa centerx como base e adiciona um offset pequeno baseado na direção
+        offset_x_arma = int(15 * self.scale)  # Offset horizontal da arma em relação ao centro
+        if self.facing == "right":
+            # Arma está ligeiramente à direita do centro
+            posicao_x_cano = self.rect.centerx + offset_x_arma
+        else:
+            # Arma está ligeiramente à esquerda do centro
+            posicao_x_cano = self.rect.centerx - offset_x_arma
+        
+        # Ajusta a posição Y para a altura da arma
+        # A arma está próxima ao centro vertical, ligeiramente acima do centro
+        # Usa centery como base e ajusta para cima (offset negativo)
+        offset_y_arma = int(self.rect.height * 0.10)  # 10% da altura (offset para cima do centro)
+        posicao_y_cano = self.rect.centery - offset_y_arma  # Ligeiramente acima do centro
         
         velocidade = 8
         return ProjetilInimigo(posicao_x_cano, posicao_y_cano, direcao_x, direcao_y, velocidade, self.scale)
@@ -596,6 +756,13 @@ class Careca(pygame.sprite.Sprite):
         self.health -= dano
         
         if self.health <= 0:
+            # CRÍTICO: Preserva a posição Y ANTES de iniciar a animação de morte
+            # Isso garante que o inimigo morre na mesma posição onde estava
+            if hasattr(self, 'rect') and self.rect is not None:
+                self._death_base_y = self.rect.bottom
+            else:
+                self._death_base_y = None
+            
             self.is_dying = True
             self.alive = False
             self.frame_index = 0
@@ -616,8 +783,15 @@ class Careca(pygame.sprite.Sprite):
         # Atualiza cooldowns
         if self.shoot_cooldown > 0:
             self.shoot_cooldown -= delta_tempo
+        
+        # Decrementa shot_timer (apenas para controle interno, não afeta a animação)
         if self.shot_timer > 0:
             self.shot_timer -= delta_tempo
+            # Garante que não fica negativo
+            if self.shot_timer < 0:
+                self.shot_timer = 0.0
+        else:
+            self.shot_timer = 0.0
         
         # Comportamento: fica parado e atira
         if protagonista_pos:
@@ -627,40 +801,141 @@ class Careca(pygame.sprite.Sprite):
             # Sempre atualiza a direção para olhar para o protagonista
             self.atualizar_direcao(alvo_x, camera_x)
         
-        # Escolhe animação (sempre idle ou shot, nunca run pois não se move)
-        if self.shot_timer > 0:
-            quadros = self.shot_frames if self.shot_frames else self.idle_frames
-            tempo_quadro = max(0.06, self.animation_speed * 0.8)
-        else:
-            quadros = self.idle_frames
-            tempo_quadro = self.animation_speed
+        # CRÍTICO: Sempre usa animação de shot (nunca muda para idle)
+        # Isso evita problemas de transição e mantém a animação consistente
+        # A animação de shot será repetida em loop continuamente
+        quadros = self.shot_frames if self.shot_frames else self.idle_frames
+        tempo_quadro = max(0.08, self.animation_speed)  # Velocidade normal para shot
         
         # Calcula a posição na tela primeiro
         centro_x_tela = int(self.world_x - camera_x)
         
-        # Atualiza animação
-        self.animation_timer += delta_tempo
-        if self.animation_timer >= tempo_quadro:
-            passos = int(self.animation_timer / tempo_quadro)
-            self.animation_timer -= passos * tempo_quadro
-            self.frame_index = (self.frame_index + passos) % len(quadros)
-            
-            # Preserva posições antes de recriar o rect
-            base_anterior = self.rect.bottom if hasattr(self, 'rect') else 0
-            centro_x_anterior = self.rect.centerx if hasattr(self, 'rect') else centro_x_tela
-            
-            quadro = quadros[self.frame_index]
-            if self.facing == "left":
-                quadro = pygame.transform.flip(quadro, True, False)
-            
-            self.image = quadro
-            self.rect = self.image.get_rect()
-            # Restaura posições após recriar o rect
-            self.rect.centerx = centro_x_anterior
-            self.rect.bottom = base_anterior
+        # Preserva posições ANTES de atualizar a animação (importante para manter posição fixa)
+        # IMPORTANTE: Preserva o bottom ANTES de qualquer atualização para manter posição Y fixa
+        if hasattr(self, 'rect') and self.rect is not None:
+            base_anterior = self.rect.bottom
+        else:
+            # Se não tem rect ainda (primeira vez), usa uma posição padrão
+            # O rect foi criado no __init__ com center=(x, y), então o bottom está definido
+            base_anterior = self.rect.bottom if hasattr(self, 'rect') else 550  # CHAO_Y padrão
         
-        # SEMPRE atualiza a posição X baseado em world_x - camera_x
+        # Como sempre usamos shot_frames, não há mudança de animação
+        # Mas verificamos se os quadros mudaram (não deveria acontecer, mas por segurança)
+        quadros_mudou = not hasattr(self, '_ultimos_quadros') or id(self._ultimos_quadros) != id(quadros)
+        
+        # Se os quadros mudaram (não deveria acontecer), reseta apenas para segurança
+        if quadros_mudou:
+            self.frame_index = 0
+            self.animation_timer = 0.0
+            self._ultimos_quadros = quadros
+            # Garante que o frame_index está válido para a nova lista de quadros
+            if len(quadros) > 0 and self.frame_index >= len(quadros):
+                self.frame_index = 0
+        
+        # Atualiza animação normalmente (apenas o frame_index, não a posição)
+        # IMPORTANTE: Garante que quadros não está vazio antes de atualizar
+        if len(quadros) == 0:
+            # Se não há frames, não atualiza a animação
+            self.frame_index = 0
+        else:
+            # Garante que frame_index está dentro dos limites antes de atualizar
+            if self.frame_index < 0:
+                self.frame_index = 0
+            elif self.frame_index >= len(quadros):
+                self.frame_index = len(quadros) - 1
+            
+            # Atualiza animação normalmente (sempre em loop, sem transições)
+            self.animation_timer += delta_tempo
+            if self.animation_timer >= tempo_quadro:
+                passos = int(self.animation_timer / tempo_quadro)
+                self.animation_timer -= passos * tempo_quadro
+                # Atualiza frame_index usando módulo para garantir que está dentro dos limites
+                # O módulo garante que a animação fica em loop contínuo
+                self.frame_index = (self.frame_index + passos) % len(quadros)
+                # Garante que frame_index está válido após a atualização
+                if self.frame_index < 0:
+                    self.frame_index = 0
+                elif self.frame_index >= len(quadros):
+                    self.frame_index = len(quadros) - 1
+        
+        # SEMPRE atualiza a imagem e rect para garantir que está correto
+        # Garante que frame_index está dentro dos limites válidos
+        if len(quadros) > 0:
+            # Garante que frame_index está dentro dos limites válidos [0, len(quadros)-1]
+            if self.frame_index < 0:
+                self.frame_index = 0
+            elif self.frame_index >= len(quadros):
+                self.frame_index = len(quadros) - 1
+            frame_idx = self.frame_index
+        else:
+            frame_idx = 0
+            self.frame_index = 0
+        
+        # Verifica se o índice é válido antes de acessar
+        # IMPORTANTE: Garante que frame_idx está dentro dos limites válidos ANTES de acessar
+        if len(quadros) == 0:
+            # Se não há frames, usa fallback
+            quadro = self._superficie_fallback(self.scale)
+            self.frame_index = 0
+        elif frame_idx < 0 or frame_idx >= len(quadros):
+            # Se o índice for inválido, usa o primeiro frame como fallback
+            frame_idx = 0
+            self.frame_index = 0
+            try:
+                quadro_original = quadros[frame_idx]
+                quadro = quadro_original.copy()
+            except (IndexError, TypeError, AttributeError) as e:
+                # Se ainda houver erro, usa fallback
+                print(f"Erro ao acessar frame {frame_idx} de {len(quadros)} frames: {e}")
+                quadro = self._superficie_fallback(self.scale)
+                self.frame_index = 0
+        else:
+            # Pega o quadro e cria uma cópia para evitar problemas de referência
+            # IMPORTANTE: Sempre pega o quadro original e cria uma nova cópia
+            try:
+                quadro_original = quadros[frame_idx]
+                # Verifica se o quadro é válido
+                if quadro_original is None:
+                    raise ValueError("Quadro é None")
+                quadro = quadro_original.copy()
+            except (IndexError, TypeError, AttributeError, ValueError) as e:
+                # Se houver erro ao acessar o frame, usa fallback
+                print(f"Erro ao acessar frame {frame_idx} de {len(quadros)} frames na animação: {e}")
+                if len(quadros) > 0:
+                    try:
+                        quadro_original = quadros[0]
+                        quadro = quadro_original.copy()
+                        self.frame_index = 0
+                    except:
+                        # Se até o primeiro frame falhar, usa fallback
+                        quadro = self._superficie_fallback(self.scale)
+                        self.frame_index = 0
+                else:
+                    # Se não há frames disponíveis, usa fallback
+                    quadro = self._superficie_fallback(self.scale)
+                    self.frame_index = 0
+        
+        # Aplica flip apenas uma vez se necessário
+        direcao_atual = self.facing
+        if direcao_atual == "left":
+            quadro = pygame.transform.flip(quadro, True, False)
+        
+        # Atualiza image (garante que é uma nova referência)
+        self.image = quadro
+        
+        # CRÍTICO: Cria um novo rect baseado na nova imagem
+        # Mas SEMPRE usa as mesmas coordenadas para centerx e bottom
+        # Isso garante que o sprite nunca se move durante QUALQUER animação (idle ou shot)
+        # Como todos os frames foram normalizados para terem o mesmo tamanho,
+        # a posição será sempre consistente, independente do frame atual.
+        self.rect = self.image.get_rect()
+        
+        # SEMPRE define a posição exatamente da mesma forma, independente do frame ou animação
+        # centerx sempre baseado em world_x (nunca muda durante animação)
+        # bottom sempre preservado (nunca muda durante animação)
+        # Isso funciona tanto para idle quanto para shot porque ambos foram normalizados
         self.rect.centerx = centro_x_tela
+        self.rect.bottom = base_anterior
     
     def _atualizar_animacao_morte(self, delta_tempo, camera_x):
         """Atualiza a animação de morte do Careca"""
@@ -671,8 +946,27 @@ class Careca(pygame.sprite.Sprite):
         # Calcula a posição na tela primeiro
         centro_x_tela = int(self.world_x - camera_x)
         
+        # CRÍTICO: Preserva a posição Y ANTES de atualizar qualquer coisa
+        # Isso garante que o inimigo morre na mesma posição onde estava
+        # Usa a posição preservada quando take_damage foi chamado, ou a posição atual do rect
+        if self._death_base_y is not None:
+            # Usa a posição preservada quando a morte começou
+            base_anterior = self._death_base_y
+        elif hasattr(self, 'rect') and self.rect is not None:
+            # Fallback: usa a posição atual do rect
+            base_anterior = self.rect.bottom
+        else:
+            # Se não tem rect, usa uma posição padrão
+            base_anterior = 550  # CHAO_Y padrão
+        
         total_quadros = len(self.dead_frames)
         indice_ultimo_quadro = total_quadros - 1
+        
+        # Garante que frame_index está válido
+        if self.frame_index < 0:
+            self.frame_index = 0
+        elif self.frame_index >= total_quadros:
+            self.frame_index = indice_ultimo_quadro
         
         if self.frame_index == indice_ultimo_quadro:
             self.dead_timer += delta_tempo
@@ -692,21 +986,25 @@ class Careca(pygame.sprite.Sprite):
             else:
                 quadro = self.dead_frames[self.frame_index]
         
-        # Preserva posições antes de recriar o rect
-        base_anterior = self.rect.bottom if hasattr(self, 'rect') else 0
-        centro_x_anterior = self.rect.centerx if hasattr(self, 'rect') else centro_x_tela
-        
+        # Cria uma cópia do quadro antes de aplicar flip
+        quadro_copia = quadro.copy()
         if self.facing == "left":
-            quadro = pygame.transform.flip(quadro, True, False)
+            quadro_copia = pygame.transform.flip(quadro_copia, True, False)
         
-        self.image = quadro
+        self.image = quadro_copia
+        
+        # CRÍTICO: Cria um novo rect baseado na nova imagem
+        # Mas SEMPRE usa as mesmas coordenadas para centerx e bottom
+        # Como os frames de morte foram normalizados, todos têm o mesmo tamanho
+        # Isso garante que a posição não muda durante a animação de morte
         self.rect = self.image.get_rect()
-        # Restaura posições após recriar o rect
-        self.rect.centerx = centro_x_anterior
-        self.rect.bottom = base_anterior
         
-        # SEMPRE atualiza a posição X baseado em world_x - camera_x
+        # SEMPRE define a posição exatamente da mesma forma
+        # centerx sempre baseado em world_x (nunca muda)
+        # bottom sempre preservado (nunca muda)
+        # Isso garante que o inimigo morre na mesma posição onde estava
         self.rect.centerx = centro_x_tela
+        self.rect.bottom = base_anterior
 
 
 class ProjetilInimigo(pygame.sprite.Sprite):
@@ -725,9 +1023,6 @@ class ProjetilInimigo(pygame.sprite.Sprite):
         nova_altura = max(1, int(round(imagem.get_height() * escala)))
         self.image = pygame.transform.scale(imagem, (nova_largura, nova_altura))
         
-        # Rotaciona a imagem baseado na direção do movimento
-        angulo = math.degrees(math.atan2(-direcao_y, direcao_x))
-        self.image = pygame.transform.rotate(self.image, angulo)
         
         self.rect = self.image.get_rect(center=(x, y))
         

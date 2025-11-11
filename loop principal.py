@@ -25,16 +25,18 @@ def mostrar_tela_introducao():
     # Tenta carregar a imagem
     try:
         imagem_intro = pygame.image.load(caminho_intro).convert()
-        # Redimensiona a imagem para preencher toda a tela (800x600)
-        imagem_intro = pygame.transform.smoothscale(imagem_intro, (LARGURA_TELA, ALTURA_TELA))
-        x_intro = 0
-        y_intro = 0
+        # Mantém o tamanho original da imagem e centraliza
+        largura_img, altura_img = imagem_intro.get_size()
+        x_intro = (LARGURA_TELA - largura_img) // 2
+        y_intro = (ALTURA_TELA - altura_img) // 2
     except Exception:
         # Se não encontrar a imagem, cria uma tela preta simples
         imagem_intro = pygame.Surface((LARGURA_TELA, ALTURA_TELA))
         imagem_intro.fill((0, 0, 0))
         x_intro = 0
         y_intro = 0
+        largura_img = LARGURA_TELA
+        altura_img = ALTURA_TELA
     
     # Timer para a tela de introdução
     tempo_intro = 0.0
@@ -58,14 +60,128 @@ def mostrar_tela_introducao():
             intro_rodando = False
         
         # Desenha a imagem de introdução
-        tela.fill((0, 0, 0))  # Fundo preto
+        tela.fill((0, 0, 0))  # Fundo preto (barras pretas nas laterais)
+        # Desenha a imagem centralizada (as áreas não cobertas pela imagem ficam pretas)
         tela.blit(imagem_intro, (x_intro, y_intro))
+        pygame.display.flip()
+    
+    return True  # Continua para o jogo
+
+# --- Função para obter fonte arcade ---
+def obter_fonte_arcade(tamanho):
+    """Obtém uma fonte arcade pixelizada (monospace)"""
+    try:
+        # Tenta usar uma fonte monospace que tem estilo arcade
+        # pygame.font.match_font tenta encontrar uma fonte monospace no sistema
+        fonte_monospace = pygame.font.match_font('courier') or pygame.font.match_font('monospace')
+        if fonte_monospace:
+            return pygame.font.Font(fonte_monospace, tamanho)
+        else:
+            # Fallback para fonte padrão
+            return pygame.font.Font(None, tamanho)
+    except:
+        # Fallback para fonte padrão
+        return pygame.font.Font(None, tamanho)
+
+# --- Variáveis globais para nome e contador ---
+nome_usuario = ""
+inimigos_mortos = 0
+historico_jogadores = []  # Lista de dicionários: [{"nome": str, "mortes": int}, ...]
+
+# --- Função para obter nome do usuário ---
+def obter_nome_usuario():
+    """Mostra pop-up para o usuário digitar seu nome"""
+    global nome_usuario
+    
+    # Caminho da imagem de introdução (para mostrar de fundo)
+    caminho_intro = os.path.normpath("assets/Imagens/Intro/Capa.png")
+    try:
+        imagem_fundo = pygame.image.load(caminho_intro).convert()
+        # Mantém o tamanho original da imagem e centraliza
+        largura_img, altura_img = imagem_fundo.get_size()
+        x_fundo = (LARGURA_TELA - largura_img) // 2
+        y_fundo = (ALTURA_TELA - altura_img) // 2
+    except Exception:
+        imagem_fundo = pygame.Surface((LARGURA_TELA, ALTURA_TELA))
+        imagem_fundo.fill((0, 0, 0))
+        x_fundo = 0
+        y_fundo = 0
+        largura_img = LARGURA_TELA
+        altura_img = ALTURA_TELA
+    
+    nome_digitado = ""
+    digitando = True
+    
+    while digitando:
+        delta_tempo = relogio.tick(FPS) / 1000.0
+        
+        for evento in pygame.event.get():
+            if evento.type == pygame.QUIT:
+                return False  # Fecha o jogo
+            elif evento.type == pygame.KEYDOWN:
+                if evento.key == pygame.K_RETURN or evento.key == pygame.K_KP_ENTER:
+                    # Enter pressionado - inicia o jogo
+                    nome_usuario = nome_digitado if nome_digitado else "Jogador"
+                    digitando = False
+                elif evento.key == pygame.K_BACKSPACE:
+                    # Remove último caractere
+                    nome_digitado = nome_digitado[:-1]
+                else:
+                    # Adiciona caractere (limita a 20 caracteres)
+                    if len(nome_digitado) < 20 and evento.unicode.isprintable():
+                        nome_digitado += evento.unicode
+        
+        # Desenha fundo
+        tela.fill((0, 0, 0))  # Fundo preto (barras pretas nas laterais)
+        # Desenha a imagem centralizada (as áreas não cobertas pela imagem ficam pretas)
+        tela.blit(imagem_fundo, (x_fundo, y_fundo))
+        
+        # Desenha pop-up (igual ao pop-up de game over)
+        popup_largura = 400
+        popup_altura = 300
+        popup_x = (LARGURA_TELA - popup_largura) // 2
+        popup_y = (ALTURA_TELA - popup_altura) // 2
+        espessura_borda = 4
+        
+        # Desenha borda cinza
+        popup_borda = pygame.Surface((popup_largura, popup_altura))
+        popup_borda.fill((128, 128, 128))
+        tela.blit(popup_borda, (popup_x, popup_y))
+        
+        # Desenha preenchimento preto
+        popup_interno = pygame.Surface((popup_largura - espessura_borda * 2, popup_altura - espessura_borda * 2))
+        popup_interno.fill((0, 0, 0))
+        tela.blit(popup_interno, (popup_x + espessura_borda, popup_y + espessura_borda))
+        
+        # Desenha "Nome de Usuário:"
+        fonte_titulo = obter_fonte_arcade(24)
+        texto_titulo = fonte_titulo.render("Nome de Usuário:", False, (255, 255, 255))
+        rect_titulo = texto_titulo.get_rect(center=(LARGURA_TELA // 2, popup_y + 80))
+        tela.blit(texto_titulo, rect_titulo)
+        
+        # Desenha campo de texto (nome digitado)
+        fonte_nome = obter_fonte_arcade(20)
+        texto_nome = fonte_nome.render(nome_digitado if nome_digitado else "_", False, (255, 255, 255))
+        rect_nome = texto_nome.get_rect(center=(LARGURA_TELA // 2, popup_y + 130))
+        tela.blit(texto_nome, rect_nome)
+        
+        # Desenha "Pressione (ENTER) para Iniciar"
+        fonte_instrucao = obter_fonte_arcade(18)
+        texto_instrucao = fonte_instrucao.render("Pressione (ENTER) para Iniciar", False, (255, 255, 255))
+        rect_instrucao = texto_instrucao.get_rect(center=(LARGURA_TELA // 2, popup_y + popup_altura - 50))
+        tela.blit(texto_instrucao, rect_instrucao)
+        
         pygame.display.flip()
     
     return True  # Continua para o jogo
 
 # Mostra a tela de introdução
 if not mostrar_tela_introducao():
+    pygame.quit()
+    exit()
+
+# Mostra pop-up de nome de usuário
+if not obter_nome_usuario():
     pygame.quit()
     exit()
 
@@ -179,21 +295,25 @@ def desenhar_coracoes_vida(tela, jogador, x=20, y=20, tamanho_coracao=30):
             # Coração vazio (usa a versão em cache)
             tela.blit(coracao_vazio, (x_coracao, y_coracao))
 
-# --- Função para obter fonte arcade ---
-def obter_fonte_arcade(tamanho):
-    """Obtém uma fonte arcade pixelizada (monospace)"""
-    try:
-        # Tenta usar uma fonte monospace que tem estilo arcade
-        # pygame.font.match_font tenta encontrar uma fonte monospace no sistema
-        fonte_monospace = pygame.font.match_font('courier') or pygame.font.match_font('monospace')
-        if fonte_monospace:
-            return pygame.font.Font(fonte_monospace, tamanho)
-        else:
-            # Fallback para fonte padrão
-            return pygame.font.Font(None, tamanho)
-    except:
-        # Fallback para fonte padrão
-        return pygame.font.Font(None, tamanho)
+# --- Função para salvar jogador atual no histórico ---
+def salvar_jogador_atual():
+    """Salva o jogador atual no histórico antes de resetar"""
+    global nome_usuario, inimigos_mortos, historico_jogadores
+    
+    # Só salva se tiver um nome (mesmo que não tenha mortes)
+    if nome_usuario:
+        # Verifica se o último jogador salvo já é o mesmo (evita duplicatas)
+        if len(historico_jogadores) > 0:
+            ultimo = historico_jogadores[-1]
+            if ultimo["nome"] == nome_usuario and ultimo["mortes"] == inimigos_mortos:
+                # Já foi salvo, não salva novamente
+                return
+        
+        historico_jogadores.append({
+            "nome": nome_usuario,
+            "mortes": inimigos_mortos
+        })
+        # NÃO limita mais - mantém TODOS os jogadores para poder mostrar os top 5
 
 # --- Função para reiniciar o jogo ---
 def reiniciar_jogo():
@@ -201,6 +321,10 @@ def reiniciar_jogo():
     global camera_x, jogador, grupo_jogador, projeteis, inimigos, projeteis_inimigos
     global colunas_fogo, plataformas, coracoes
     global temporizador_spawn, temporizador_spawn_fogo, temporizador_spawn_coracao
+    global inimigos_mortos
+    
+    # NÃO salva aqui porque já foi salvo quando o jogador morreu ou quando pressionou R
+    # A função salvar_jogador_atual() já foi chamada antes de reiniciar_jogo()
     
     # Reseta câmera
     camera_x = 0.0
@@ -222,6 +346,9 @@ def reiniciar_jogo():
     temporizador_spawn = 0.0
     temporizador_spawn_fogo = 0.0
     temporizador_spawn_coracao = 0.0
+    
+    # Reseta contador de mortes
+    inimigos_mortos = 0
 
 # --- Estado de Game Over ---
 game_over = False
@@ -240,6 +367,19 @@ while rodando:
         elif evento.type == pygame.KEYDOWN:
             # Detecta tecla R para reiniciar quando estiver no pop-up
             if mostrando_popup and evento.key == pygame.K_r:
+                # NÃO salva aqui porque já foi salvo quando o jogador morreu
+                # A função salvar_jogador_atual() já foi chamada quando detectou a morte
+                
+                # Volta ao início: mostra tela de introdução e pop-up de nome
+                if not mostrar_tela_introducao():
+                    rodando = False
+                    continue
+                
+                if not obter_nome_usuario():
+                    rodando = False
+                    continue
+                
+                # Reinicia o jogo
                 reiniciar_jogo()
                 game_over = False
                 game_over_timer = 0.0
@@ -256,7 +396,8 @@ while rodando:
 
     # --- Detecção de morte do jogador ---
     if jogador.is_dying and jogador_morreu_nao_detectado:
-        # Jogador acabou de morrer - inicia game over
+        # Jogador acabou de morrer - salva no histórico e inicia game over
+        salvar_jogador_atual()
         game_over = True
         game_over_timer = 0.0
         mostrando_popup = False
@@ -437,8 +578,13 @@ while rodando:
                     inimigo_atingido = inimigo
                     # Remove o projétil IMEDIATAMENTE para evitar que acerte outros inimigos
                     bala.kill()
+                    # Verifica se o inimigo estava vivo antes de aplicar dano
+                    estava_vivo = inimigo_atingido.alive and not inimigo_atingido.is_dying
                     # Aplica dano apenas ao primeiro inimigo acertado
                     inimigo_atingido.take_damage(3)  # Dano aumentado para 3
+                    # Se o inimigo morreu (estava vivo e agora está morrendo), incrementa contador
+                    if estava_vivo and inimigo_atingido.is_dying:
+                        inimigos_mortos += 1
                     break  # Para imediatamente após encontrar e processar colisão
         
         # Remove inimigos que saíram muito atrás ou à frente da câmera
@@ -676,9 +822,10 @@ while rodando:
             # Desenha o texto principal por cima do brilho
             tela.blit(texto_morreu, rect_texto)
         else:
-            # Mostra pop-up 400x300 centralizado com borda cinza e preenchimento preto
+            # Mostra pop-up 400x400 centralizado com borda cinza e preenchimento preto
+            # Aumentado para 400 para caber os 5 jogadores
             popup_largura = 400
-            popup_altura = 300
+            popup_altura = 400
             popup_x = (LARGURA_TELA - popup_largura) // 2
             popup_y = (ALTURA_TELA - popup_altura) // 2
             espessura_borda = 4  # Espessura da borda cinza
@@ -697,8 +844,30 @@ while rodando:
             fonte_titulo = obter_fonte_arcade(28)
             # Usa antialias=False para fonte pixelizada
             texto_ranking = fonte_titulo.render("Ranking de Jogadores", False, (255, 255, 255))
-            rect_ranking = texto_ranking.get_rect(center=(LARGURA_TELA // 2, popup_y + 60))
+            rect_ranking = texto_ranking.get_rect(center=(LARGURA_TELA // 2, popup_y + 40))
             tela.blit(texto_ranking, rect_ranking)
+            
+            # Ordena histórico por mortes (decrescente) e pega os top 5 com mais mortes
+            historico_ordenado = sorted(historico_jogadores, key=lambda x: x["mortes"], reverse=True)
+            historico_ordenado = historico_ordenado[:5]  # Apenas os 5 com mais mortes
+            
+            # Desenha os últimos 5 jogadores
+            fonte_resultado = obter_fonte_arcade(20)
+            y_offset = 80
+            for i, jogador_info in enumerate(historico_ordenado):
+                texto_resultado = f"{jogador_info['nome']} {jogador_info['mortes']}"
+                texto_renderizado = fonte_resultado.render(texto_resultado, False, (255, 255, 255))
+                rect_resultado = texto_renderizado.get_rect(center=(LARGURA_TELA // 2, popup_y + y_offset))
+                tela.blit(texto_renderizado, rect_resultado)
+                y_offset += 30
+            
+            # Se não houver histórico, mostra o jogador atual
+            if len(historico_ordenado) == 0 and nome_usuario:
+                fonte_resultado = obter_fonte_arcade(20)
+                texto_resultado = f"{nome_usuario} {inimigos_mortos}"
+                texto_renderizado = fonte_resultado.render(texto_resultado, False, (255, 255, 255))
+                rect_resultado = texto_renderizado.get_rect(center=(LARGURA_TELA // 2, popup_y + 80))
+                tela.blit(texto_renderizado, rect_resultado)
             
             # Desenha "PRESSIONE ( R ) PARA RECOMEÇAR" na parte de baixo do pop-up
             fonte_instrucao = obter_fonte_arcade(18)

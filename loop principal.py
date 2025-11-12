@@ -18,20 +18,60 @@ relogio = pygame.time.Clock()
 FPS = 60
 
 # --- Carrega arquivos de áudio ---
-# Música de fundo
+# Músicas de fundo
 caminho_musica_fundo = os.path.normpath("assets/Musicas/cyberpunk-street.mp3")
+caminho_musica_fundo2 = os.path.normpath("assets/Musicas/som2.mp3")
+caminho_musica_fundo3 = os.path.normpath("assets/Musicas/som3.mp3")
+caminho_musica_fundo4 = os.path.normpath("assets/Musicas/som4.mp3")
 # Sons de tiro
 caminho_som_tiro_careca = os.path.normpath("assets/Musicas/Som Tiro Careca.mp3")
 caminho_som_tiro_shelby = os.path.normpath("assets/Musicas/Som Tiro Shelby.mp3")
 
 # Carrega os sons
-# Música de fundo (usa pygame.mixer.music, não precisa de variável)
+# Músicas de fundo (usa pygame.mixer.music)
 try:
     pygame.mixer.music.load(caminho_musica_fundo)
     musica_fundo_carregada = True
 except Exception as e:
     print(f"Erro ao carregar música de fundo: {e}")
     musica_fundo_carregada = False
+
+try:
+    # Verifica se o arquivo existe
+    if os.path.exists(caminho_musica_fundo2):
+        musica_fundo2_carregada = True
+    else:
+        print(f"Arquivo não encontrado: {caminho_musica_fundo2}")
+        musica_fundo2_carregada = False
+except Exception as e:
+    print(f"Erro ao verificar música de fundo 2: {e}")
+    musica_fundo2_carregada = False
+
+try:
+    # Verifica se o arquivo existe
+    if os.path.exists(caminho_musica_fundo3):
+        musica_fundo3_carregada = True
+    else:
+        print(f"Arquivo não encontrado: {caminho_musica_fundo3}")
+        musica_fundo3_carregada = False
+except Exception as e:
+    print(f"Erro ao verificar música de fundo 3: {e}")
+    musica_fundo3_carregada = False
+
+try:
+    # Verifica se o arquivo existe
+    if os.path.exists(caminho_musica_fundo4):
+        musica_fundo4_carregada = True
+    else:
+        print(f"Arquivo não encontrado: {caminho_musica_fundo4}")
+        musica_fundo4_carregada = False
+except Exception as e:
+    print(f"Erro ao verificar música de fundo 4: {e}")
+    musica_fundo4_carregada = False
+
+# Variáveis para controle de sequência de música
+contador_cyberpunk = 0  # Conta quantas vezes cyberpunk-street.mp3 foi tocada
+estado_musica = "cyberpunk"  # Estados: "cyberpunk", "som2", "som3", "som4"
 
 # Sons de efeito (usam pygame.mixer.Sound)
 try:
@@ -216,9 +256,12 @@ if not obter_nome_usuario():
     exit()
 
 # --- Inicia música de fundo (após pressionar ENTER) ---
+# Toca cyberpunk-street.mp3 primeiro (será tocada duas vezes antes de alternar)
 if musica_fundo_carregada:
     try:
-        pygame.mixer.music.play(-1)  # -1 = loop infinito
+        pygame.mixer.music.play(0)  # 0 = toca uma vez (não loop)
+        contador_cyberpunk = 1  # Primeira vez tocando
+        estado_musica = "cyberpunk"
     except Exception as e:
         print(f"Erro ao tocar música de fundo: {e}")
 
@@ -398,6 +441,58 @@ rodando = True
 while rodando:
     delta_tempo = relogio.tick(FPS) / 1000.0  # segundos desde o último frame
 
+    # --- Controle de sequência de música ---
+    # Verifica se a música atual terminou e alterna para a próxima
+    # Sequência: cyberpunk-street.mp3 (2x) → som2.mp3 (1x) → som3.mp3 (1x) → som4.mp3 (1x) → repete
+    if not pygame.mixer.music.get_busy():
+        if estado_musica == "cyberpunk":
+            # Estava tocando cyberpunk-street.mp3
+            if contador_cyberpunk < 2:
+                # Ainda precisa tocar mais uma vez
+                contador_cyberpunk += 1
+                try:
+                    pygame.mixer.music.load(caminho_musica_fundo)
+                    pygame.mixer.music.play(0)  # Toca uma vez
+                except Exception as e:
+                    print(f"Erro ao tocar cyberpunk-street.mp3: {e}")
+            else:
+                # Já tocou duas vezes, agora toca som2.mp3
+                if musica_fundo2_carregada:
+                    try:
+                        pygame.mixer.music.load(caminho_musica_fundo2)
+                        pygame.mixer.music.play(0)  # Toca uma vez
+                        estado_musica = "som2"
+                    except Exception as e:
+                        print(f"Erro ao tocar som2.mp3: {e}")
+        elif estado_musica == "som2":
+            # Estava tocando som2.mp3, agora toca som3.mp3
+            if musica_fundo3_carregada:
+                try:
+                    pygame.mixer.music.load(caminho_musica_fundo3)
+                    pygame.mixer.music.play(0)  # Toca uma vez
+                    estado_musica = "som3"
+                except Exception as e:
+                    print(f"Erro ao tocar som3.mp3: {e}")
+        elif estado_musica == "som3":
+            # Estava tocando som3.mp3, agora toca som4.mp3
+            if musica_fundo4_carregada:
+                try:
+                    pygame.mixer.music.load(caminho_musica_fundo4)
+                    pygame.mixer.music.play(0)  # Toca uma vez
+                    estado_musica = "som4"
+                except Exception as e:
+                    print(f"Erro ao tocar som4.mp3: {e}")
+        else:  # estado_musica == "som4"
+            # Estava tocando som4.mp3, agora volta para cyberpunk-street.mp3 (reinicia sequência)
+            if musica_fundo_carregada:
+                try:
+                    pygame.mixer.music.load(caminho_musica_fundo)
+                    pygame.mixer.music.play(0)  # Toca uma vez
+                    contador_cyberpunk = 1  # Primeira vez da nova sequência
+                    estado_musica = "cyberpunk"
+                except Exception as e:
+                    print(f"Erro ao tocar cyberpunk-street.mp3: {e}")
+
     for evento in pygame.event.get():
         if evento.type == pygame.QUIT:
             rodando = False
@@ -408,7 +503,7 @@ while rodando:
                 # A função salvar_jogador_atual() já foi chamada quando detectou a morte
                 
                 # Para a música de fundo antes de reiniciar (se ainda estiver tocando)
-                if musica_fundo_carregada:
+                if musica_fundo_carregada or musica_fundo2_carregada or musica_fundo3_carregada or musica_fundo4_carregada:
                     try:
                         pygame.mixer.music.stop()
                     except Exception as e:
@@ -423,11 +518,14 @@ while rodando:
                     rodando = False
                     continue
                 
-                # Reinicia o jogo e toca música de fundo novamente
+                # Reinicia o jogo e toca música de fundo novamente (sequência recomeça)
                 reiniciar_jogo()
                 if musica_fundo_carregada:
                     try:
-                        pygame.mixer.music.play(-1)  # -1 = loop infinito
+                        pygame.mixer.music.load(caminho_musica_fundo)
+                        pygame.mixer.music.play(0)  # Toca uma vez
+                        contador_cyberpunk = 1  # Primeira vez da nova sequência
+                        estado_musica = "cyberpunk"
                     except Exception as e:
                         print(f"Erro ao tocar música de fundo: {e}")
                 game_over = False
@@ -454,7 +552,7 @@ while rodando:
         # Jogador acabou de morrer - salva no histórico e inicia game over
         salvar_jogador_atual()
         # Para a música de fundo quando o jogador morre
-        if musica_fundo_carregada:
+        if musica_fundo_carregada or musica_fundo2_carregada or musica_fundo3_carregada or musica_fundo4_carregada:
             try:
                 pygame.mixer.music.stop()
             except Exception as e:
@@ -555,8 +653,9 @@ while rodando:
         # Atualiza os projéteis do jogador primeiro
         projeteis.update(delta_tempo)
         
-        # Atualiza projéteis dos inimigos
-        projeteis_inimigos.update(delta_tempo)
+        # Atualiza projéteis dos inimigos (passa camera_x para atualizar posição corretamente)
+        for projetil in projeteis_inimigos:
+            projetil.update(delta_tempo, camera_x)
         
         # Atualiza colunas de fogo
         for coluna_fogo in colunas_fogo:
@@ -606,7 +705,8 @@ while rodando:
             if isinstance(inimigo, Careca):
                 if inimigo.alive and not inimigo.is_dying and not jogador.is_dying:
                     if inimigo.pode_atirar(posicao_mundo_x_jogador, posicao_mundo_y_jogador):
-                        projetil = inimigo.shoot(posicao_mundo_x_jogador, posicao_mundo_y_jogador)
+                        # Passa camera_x para o método shoot para calcular coordenadas do mundo corretamente
+                        projetil = inimigo.shoot(posicao_mundo_x_jogador, posicao_mundo_y_jogador, camera_x)
                         if projetil:
                             projeteis_inimigos.add(projetil)
                             # Toca som de tiro do Careca
@@ -670,10 +770,17 @@ while rodando:
                     inimigo.kill()
         
         # Projéteis dos inimigos acertam o jogador
-        jogador_atingido = pygame.sprite.spritecollide(jogador, projeteis_inimigos, True)
-        if jogador_atingido and not jogador.is_dying:
-            # Aplica dano ao jogador (o sistema de invencibilidade impede múltiplos danos)
-            jogador.take_damage(1)
+        # CRÍTICO: Verifica colisão usando rects que correspondem exatamente ao tamanho visual do projétil
+        # O rect do projétil já está do tamanho exato da imagem (sem áreas transparentes extras)
+        for projetil in list(projeteis_inimigos):
+            # Verifica colisão usando o rect do projétil (que é do tamanho exato da imagem)
+            # O rect.centerx e rect.centery já estão atualizados no update() com base em world_x e camera_x
+            if projetil.rect.colliderect(jogador.rect) and not jogador.is_dying:
+                # Remove o projétil
+                projetil.kill()
+                # Aplica dano ao jogador (o sistema de invencibilidade impede múltiplos danos)
+                jogador.take_damage(1)
+                break  # Apenas um projétil pode acertar por frame
         
         # Colisão do jogador com corações
         colisoes_coracao = pygame.sprite.spritecollide(jogador, coracoes, True)
@@ -765,7 +872,7 @@ while rodando:
                 altura_plataforma = 20
                 posicao_x_plataforma = posicao_x_fogo - largura_plataforma - 50  # 50 pixels antes da coluna
                 posicao_y_plataforma = CHAO_Y - 150  # 150 pixels acima do chão
-                plataforma = Plataforma(posicao_x_plataforma, posicao_y_plataforma, largura_plataforma, altura_plataforma)
+                plataforma = Plataforma(posicao_x_plataforma, posicao_y_plataforma, largura_plataforma, altura_plataforma, plataformas)
                 plataformas.add(plataforma)
                 
                 # Spawna inimigos na plataforma (sempre spawna pelo menos 1, 50% de chance de 2)
@@ -848,7 +955,9 @@ while rodando:
     
     # Desenha projéteis
     projeteis.draw(tela)  # Projéteis do protagonista
-    projeteis_inimigos.draw(tela)  # Projéteis dos inimigos
+    # Desenha projéteis dos inimigos usando render_rect (para mostrar a imagem completa)
+    for projetil in projeteis_inimigos:
+        tela.blit(projetil.image, projetil.render_rect)
     
     # Desenha plataformas
     for plataforma in plataformas:

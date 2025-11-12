@@ -706,7 +706,7 @@ class Careca(pygame.sprite.Sprite):
                 self.shoot_cooldown <= 0.0 and 
                 self.shot_timer <= 0.0)
     
-    def shoot(self, alvo_x, alvo_y):
+    def shoot(self, alvo_x, alvo_y, camera_x=0):
         """Dispara um projétil horizontal direcionado ao alvo"""
         if not self.alive or not self.pode_atirar(alvo_x, alvo_y):
             return None
@@ -728,25 +728,31 @@ class Careca(pygame.sprite.Sprite):
         # Sem componente vertical - projétil sempre horizontal
         direcao_y = 0
         
-        # Ponto de origem do projétil na tela
+        # CRÍTICO: Calcula a posição do cano em coordenadas do MUNDO (não da tela)
         # A arma está próxima ao centro horizontal do sprite, com um pequeno offset na direção do tiro
-        # Usa centerx como base e adiciona um offset pequeno baseado na direção
-        offset_x_arma = int(15 * self.scale)  # Offset horizontal da arma em relação ao centro
+        # Offset horizontal da arma em relação ao centro do sprite (em pixels do mundo)
+        offset_x_arma = 15 * self.scale  # Offset horizontal da arma em relação ao centro
+        
+        # Calcula world_x do cano baseado no world_x do inimigo
         if self.facing == "right":
             # Arma está ligeiramente à direita do centro
-            posicao_x_cano = self.rect.centerx + offset_x_arma
+            world_x_cano = self.world_x + offset_x_arma
         else:
             # Arma está ligeiramente à esquerda do centro
-            posicao_x_cano = self.rect.centerx - offset_x_arma
+            world_x_cano = self.world_x - offset_x_arma
         
         # Ajusta a posição Y para a altura da arma
-        # A arma está próxima ao centro vertical, ligeiramente acima do centro
-        # Usa centery como base e ajusta para cima (offset negativo)
-        offset_y_arma = int(self.rect.height * 0.10)  # 10% da altura (offset para cima do centro)
-        posicao_y_cano = self.rect.centery - offset_y_arma  # Ligeiramente acima do centro
+        # A arma está próxima ao centro vertical, mas ligeiramente abaixo do centro
+        # Usa rect.centery e ajusta ligeiramente para baixo (offset positivo pequeno)
+        offset_y_arma = int(self.rect.height * 0.05)  # 5% da altura para baixo (arma está ligeiramente abaixo do centro)
+        pos_y_cano_tela = self.rect.centery + offset_y_arma
+        
+        # Converte para coordenada Y do mundo
+        # Como a câmera não se move em Y, a coordenada Y da tela é a mesma do mundo
+        world_y_cano = float(pos_y_cano_tela)
         
         velocidade = 8
-        return ProjetilInimigo(posicao_x_cano, posicao_y_cano, direcao_x, direcao_y, velocidade, self.scale)
+        return ProjetilInimigo(world_x_cano, world_y_cano, direcao_x, direcao_y, velocidade, self.scale, camera_x)
     
     def take_damage(self, dano=1):
         """Inflige dano ao Careca"""
@@ -1009,7 +1015,7 @@ class Careca(pygame.sprite.Sprite):
 
 class ProjetilInimigo(pygame.sprite.Sprite):
     """Projétil disparado pelos inimigos"""
-    def __init__(self, x, y, direcao_x, direcao_y, velocidade, escala=1.0):
+    def __init__(self, world_x, world_y, direcao_x, direcao_y, velocidade, escala=1.0, camera_x=0):
         super().__init__()
         # Usa o mesmo sprite de projétil do protagonista
         try:
@@ -1023,20 +1029,59 @@ class ProjetilInimigo(pygame.sprite.Sprite):
         nova_altura = max(1, int(round(imagem.get_height() * escala)))
         self.image = pygame.transform.scale(imagem, (nova_largura, nova_altura))
         
+        # CRÍTICO: Coordenadas do mundo (não da tela)
+        self.world_x = float(world_x)  # Posição X no mundo
+        self.world_y = float(world_y)  # Posição Y no mundo (fixa, projétil horizontal)
         
-        self.rect = self.image.get_rect(center=(x, y))
+        # CRÍTICO: Cria um rect de colisão menor que corresponde ao tamanho visual real da bala
+        # A imagem do projétil pode ter áreas transparentes, então reduzimos o rect de colisão
+        largura_imagem = self.image.get_width()
+        altura_imagem = self.image.get_height()
+        
+        # Reduz o rect de colisão para 10% do tamanho da imagem (compensa áreas transparentes)
+        # Isso garante que a área de colisão seja próxima do tamanho visual real da bala
+        # Quanto menor o percentual, mais precisa será a colisão (10% para área extremamente precisa)
+        largura_colisao = max(1, int(largura_imagem * 0.10))
+        altura_colisao = max(1, int(altura_imagem * 0.10))
+        
+        # Cria rect de colisão menor que a imagem
+        self.rect = pygame.Rect(0, 0, largura_colisao, altura_colisao)
+        
+        # Rect para renderização (tamanho completo da imagem)
+        self.render_rect = pygame.Rect(0, 0, largura_imagem, altura_imagem)
+        
+        # Posiciona ambos os rects na tela baseado nas coordenadas do mundo
+        pos_x_tela = int(self.world_x - camera_x)
+        pos_y_tela = int(self.world_y)
+        self.rect.centerx = pos_x_tela
+        self.rect.centery = pos_y_tela
+        self.render_rect.centerx = pos_x_tela
+        self.render_rect.centery = pos_y_tela
         
         self.direction_x = direcao_x
         self.direction_y = direcao_y
         self.speed = velocidade
+        self.escala = escala
         
-    def update(self, delta_tempo):
-        """Atualiza a posição do projétil"""
-        self.rect.x += int(self.direction_x * self.speed)
-        self.rect.y += int(self.direction_y * self.speed)
+    def update(self, delta_tempo, camera_x=0):
+        """Atualiza a posição do projétil no mundo e na tela"""
+        # Move no mundo (não na tela)
+        self.world_x += self.direction_x * self.speed
+        
+        # CRÍTICO: Atualiza a posição na tela baseada na câmera
+        # Atualiza rect de colisão (menor, para área de colisão precisa)
+        pos_x_tela = int(self.world_x - camera_x)
+        pos_y_tela = int(self.world_y)
+        self.rect.centerx = pos_x_tela
+        self.rect.centery = pos_y_tela
+        
+        # Atualiza rect de renderização (para desenhar a imagem completa)
+        self.render_rect.centerx = pos_x_tela
+        self.render_rect.centery = pos_y_tela
         
         # Remove projéteis que saem da tela
-        if (self.rect.right < -100 or self.rect.left > 900 or 
+        # Usa world_x para verificar se saiu do mundo visível
+        if (self.world_x < camera_x - 200 or self.world_x > camera_x + 1000 or
             self.rect.bottom < -100 or self.rect.top > 700):
             self.kill()
 
@@ -1184,28 +1229,90 @@ class ColunaFogo(pygame.sprite.Sprite):
 
 
 class Plataforma(pygame.sprite.Sprite):
-    """Plataforma cinza claro que aparece antes das colunas de fogo"""
-    def __init__(self, x, y, largura=200, altura=20):
+    """Plataforma preta com brilho vermelho que aparece antes das colunas de fogo"""
+    def __init__(self, x, y, largura=200, altura=20, plataformas_grupo=None):
         super().__init__()
         self.width = largura
         self.height = altura
+        self.plataformas_grupo = plataformas_grupo  # Referência ao grupo de plataformas para verificar duplas
         
-        # Cria uma superfície cinza claro
-        self.image = pygame.Surface((largura, altura))
-        self.image.fill((180, 180, 180))  # Cinza claro
+        # Cria uma superfície maior para incluir o brilho vermelho
+        espessura_brilho = 3  # Espessura do brilho em pixels
+        largura_com_brilho = largura + (espessura_brilho * 2)
+        altura_com_brilho = altura + (espessura_brilho * 2)
+        
+        self.image = pygame.Surface((largura_com_brilho, altura_com_brilho), pygame.SRCALPHA)
+        
+        # Verifica se há plataformas próximas (duplas) para não desenhar brilho lateral entre elas
+        tem_plataforma_esquerda = False
+        tem_plataforma_direita = False
+        
+        if self.plataformas_grupo:
+            distancia_maxima = 50  # Distância máxima para considerar plataformas como "duplas"
+            for outra_plataforma in self.plataformas_grupo:
+                if outra_plataforma == self:
+                    continue
+                # Verifica se está na mesma altura Y (com tolerância)
+                if abs(outra_plataforma.world_y - y) < 10:
+                    # Verifica se está à esquerda
+                    if outra_plataforma.world_x < x and abs(outra_plataforma.world_x + outra_plataforma.width - x) < distancia_maxima:
+                        tem_plataforma_esquerda = True
+                    # Verifica se está à direita
+                    elif outra_plataforma.world_x > x and abs(outra_plataforma.world_x - (x + largura)) < distancia_maxima:
+                        tem_plataforma_direita = True
+        
+        # Desenha o brilho vermelho ao redor (outline)
+        # Desenha várias camadas para criar um efeito de brilho
+        cor_vermelho_brilho = (255, 0, 0)  # Vermelho puro
+        cor_vermelho_escuro = (200, 0, 0)  # Vermelho mais escuro para profundidade
+        
+        # Camada externa (mais escura) - apenas onde não há plataforma adjacente
+        if not tem_plataforma_esquerda:
+            pygame.draw.rect(self.image, cor_vermelho_escuro, 
+                            (0, 0, espessura_brilho, altura_com_brilho))  # Lado esquerdo
+        if not tem_plataforma_direita:
+            pygame.draw.rect(self.image, cor_vermelho_escuro, 
+                            (largura_com_brilho - espessura_brilho, 0, espessura_brilho, altura_com_brilho))  # Lado direito
+        # Topo e fundo sempre têm brilho
+        pygame.draw.rect(self.image, cor_vermelho_escuro, 
+                        (0, 0, largura_com_brilho, espessura_brilho))  # Topo
+        pygame.draw.rect(self.image, cor_vermelho_escuro, 
+                        (0, altura_com_brilho - espessura_brilho, largura_com_brilho, espessura_brilho))  # Fundo
+        
+        # Camada interna (mais brilhante) - apenas onde não há plataforma adjacente
+        if not tem_plataforma_esquerda:
+            pygame.draw.rect(self.image, cor_vermelho_brilho,
+                            (espessura_brilho // 2, espessura_brilho // 2,
+                             espessura_brilho, altura_com_brilho - espessura_brilho))  # Lado esquerdo
+        if not tem_plataforma_direita:
+            pygame.draw.rect(self.image, cor_vermelho_brilho,
+                            (largura_com_brilho - espessura_brilho - (espessura_brilho // 2), espessura_brilho // 2,
+                             espessura_brilho, altura_com_brilho - espessura_brilho))  # Lado direito
+        # Topo e fundo sempre têm brilho
+        pygame.draw.rect(self.image, cor_vermelho_brilho,
+                        (espessura_brilho // 2, espessura_brilho // 2,
+                         largura_com_brilho - espessura_brilho, espessura_brilho))  # Topo
+        pygame.draw.rect(self.image, cor_vermelho_brilho,
+                        (espessura_brilho // 2, altura_com_brilho - espessura_brilho - (espessura_brilho // 2),
+                         largura_com_brilho - espessura_brilho, espessura_brilho))  # Fundo
+        
+        # Desenha a plataforma preta no centro
+        pygame.draw.rect(self.image, (0, 0, 0),  # Preto
+                        (espessura_brilho, espessura_brilho, largura, altura))
         
         self.rect = self.image.get_rect()
-        self.rect.x = x
-        self.rect.y = y
+        self.rect.x = x - espessura_brilho  # Ajusta posição para compensar o brilho
+        self.rect.y = y - espessura_brilho
         
         # Posição no mundo (para seguir a câmera)
         self.world_x = x
         self.world_y = y
+        self.espessura_brilho = espessura_brilho
     
     def update(self, camera_x):
         """Atualiza a posição da plataforma baseada na câmera"""
-        self.rect.x = int(self.world_x - camera_x)
-        self.rect.y = int(self.world_y)
+        self.rect.x = int(self.world_x - camera_x) - self.espessura_brilho
+        self.rect.y = int(self.world_y) - self.espessura_brilho
 
 
 class Coracao(pygame.sprite.Sprite):

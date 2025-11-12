@@ -58,3 +58,18 @@ fire_frames_paths = [
 
 #item coração
 heart_path = os.path.normpath("assets/Imagens/Vida.png")
+
+#músicas de fundo
+base_musicas = os.path.normpath("assets/Musicas")
+musica_fundo = os.path.join(base_musicas, "cyberpunk-street.mp3")
+musica_fundo2 = os.path.join(base_musicas, "som2.mp3")
+musica_fundo3 = os.path.join(base_musicas, "som3.mp3")
+musica_fundo4 = os.path.join(base_musicas, "som4.mp3")
+musica_final = os.path.join(base_musicas, "final.mp3")
+
+#sons de efeito
+som_tiro_careca_path = os.path.join(base_musicas, "Som Tiro Careca.mp3")
+som_tiro_shelby_path = os.path.join(base_musicas, "Som Tiro Shelby.mp3")
+
+#imagens de introdução
+intro_capa_path = os.path.normpath("assets/Imagens/Intro/Capa.png")

@@ -34,6 +34,12 @@ def desenhar_parallax(screen, camadas, camera_x, screen_width):
             continue
         offset = int(camera_x * fator) % largura_img
         x = -offset
+        # Garante que não desenha além da largura da tela
         while x < screen_width:
-            screen.blit(img, (x, 0))
+            # Só desenha se a imagem estiver dentro ou parcialmente dentro da tela
+            if x + largura_img > 0:  # Se a imagem começa antes do fim da tela
+                screen.blit(img, (x, 0))
             x += largura_img
+            # Para o loop se já passou da tela
+            if x >= screen_width:
+                break

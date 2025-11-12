@@ -4,6 +4,7 @@ import os
 from assets import*
 
 class Protagonista(pygame.sprite.Sprite):
+    """Jogador controlável: animação, pulo, vida e tiro."""
     def __init__(self, x, y, scale=1.5,
                  idle_count=6, run_count=10, jump_count=10, double_count=6):
         super().__init__()

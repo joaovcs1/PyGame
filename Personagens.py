@@ -31,14 +31,18 @@ class Protagonista(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(x, y))
 
         # movimento horizontal
-        self.speed = 5
+        self.speed = 7  # Aumentado de 5 para 7 (40% mais rápido)
         self.facing = "right"
+        
+        # Posição no mundo (para movimento quando a câmera está bloqueada)
+        self.world_x = float(x)  # Posição X no mundo (centro X)
+        self.world_y = float(self.rect.bottom)  # Posição Y no mundo (bottom do personagem)
 
         # física vertical (AJUSTAR AQUI PARA CONTROLAR ALTURA DO PULO)
 
         self.vel_y = 0.0
-        self.gravidade = 0.45        
-        self.jump_force = -12.0      # Aumentado mais para melhor alcance nas plataformas
+        self.gravidade = 0.65  # Aumentado de 0.45 para 0.65 (aproximadamente 44% mais rápido)        
+        self.jump_force = -15.0      # Aumentado mais para melhor alcance nas plataformas
         self.double_jump_force = -10.0  # Aumentado proporcionalmente
         self.no_chao = True
         self.can_double_jump = True
@@ -309,7 +313,7 @@ class Protagonista(pygame.sprite.Sprite):
         offset_y_arma = int(imagem.get_height() * 0.22)  # 22% da altura do sprite para baixo
         posicao_y_cano = self.rect.centery + offset_y_arma
         direcao = 1 if self.facing == "right" else -1
-        velocidade = 20  # Aumentada de 12 para 20 para balas mais rápidas
+        velocidade = 28  # Aumentada de 20 para 28 (40% mais rápido)
         return Projetil(posicao_x_cano, posicao_y_cano, direcao, velocidade, self.scale)
 
 

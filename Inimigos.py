@@ -35,12 +35,12 @@ class InimigoCyborg(pygame.sprite.Sprite):
         self.rect = self.image.get_rect(center=(x, y))
         
         # Movimento e direção
-        self.speed = 3.575  # 43% mais rápido que o original (2.5 * 1.43 = 3.575)
+        self.speed = 5.0  # Aumentado de 3.575 para 5.0 (aproximadamente 40% mais rápido)
         self.facing = "left"  # Inimigos começam olhando para esquerda por padrão
         
         # Física vertical
         self.vel_y = 0.0
-        self.gravidade = 0.45
+        self.gravidade = 0.65  # Aumentado de 0.45 para 0.65 (aproximadamente 44% mais rápido)
         self.no_chao = True
         
         # Sistema de soco (corpo-a-corpo)
@@ -521,7 +521,7 @@ class Careca(pygame.sprite.Sprite):
         
         # Física vertical
         self.vel_y = 0.0
-        self.gravidade = 0.45
+        self.gravidade = 0.65  # Aumentado de 0.45 para 0.65 (aproximadamente 44% mais rápido)
         self.no_chao = True
         
         # Sistema de tiro (atirador de longe)
@@ -529,7 +529,8 @@ class Careca(pygame.sprite.Sprite):
         self.shoot_cooldown = random.uniform(0.0, 1.2)  # Cooldown inicial aleatório entre 0 e 1.2 segundos
         self.shoot_interval = 1.2  # Atira a cada 1.2 segundos
         self.detection_range = 800  # Detecta o player de longe
-        self.shoot_range = 700  # Alcance de tiro (muito longe)
+        self.shoot_range = 700  # Alcance de tiro máximo (muito longe)
+        self.shoot_range_min = 300  # Alcance de tiro mínimo (só atira se estiver a pelo menos esta distância)
         
         # Saúde
         self.health = 6
@@ -704,7 +705,8 @@ class Careca(pygame.sprite.Sprite):
     def pode_atirar(self, alvo_x, alvo_y):
         """Verifica se o Careca pode atirar no alvo"""
         distancia = self.calcular_distancia(alvo_x, alvo_y)
-        return (distancia <= self.shoot_range and 
+        return (distancia >= self.shoot_range_min and  # Distância mínima (não atira muito perto)
+                distancia <= self.shoot_range and      # Distância máxima
                 self.shoot_cooldown <= 0.0 and 
                 self.shot_timer <= 0.0)
     
@@ -715,6 +717,11 @@ class Careca(pygame.sprite.Sprite):
         
         self.shot_timer = self.shot_duration
         self.shoot_cooldown = self.shoot_interval
+        
+        # CRÍTICO: Reseta a animação para sincronizar o projétil com a animação de ataque
+        # Isso garante que o projétil saia no momento correto da animação
+        self.frame_index = 0
+        self.animation_timer = 0.0
         
         # Calcula direção do tiro apenas horizontal (sem componente vertical)
         mundo_x_inimigo = self.world_x
@@ -753,7 +760,7 @@ class Careca(pygame.sprite.Sprite):
         # Como a câmera não se move em Y, a coordenada Y da tela é a mesma do mundo
         world_y_cano = float(pos_y_cano_tela)
         
-        velocidade = 8
+        velocidade = 11  # Aumentado de 8 para 11 (aproximadamente 40% mais rápido)
         return ProjetilInimigo(world_x_cano, world_y_cano, direcao_x, direcao_y, velocidade, self.scale, camera_x)
     
     def take_damage(self, dano=1):
@@ -1055,28 +1062,25 @@ class ProjetilInimigo(pygame.sprite.Sprite):
         self.world_x = float(world_x)  # Posição X no mundo
         self.world_y = float(world_y)  # Posição Y no mundo (fixa, projétil horizontal)
         
-        # CRÍTICO: Cria um rect de colisão menor que corresponde ao tamanho visual real da bala
-        # A imagem do projétil pode ter áreas transparentes, então reduzimos o rect de colisão
+        # CRÍTICO: Cria um rect de colisão que corresponde exatamente ao tamanho visual da bala
+        # A área de colisão deve ser exatamente do tamanho da imagem, sem se estender abaixo
         largura_imagem = self.image.get_width()
         altura_imagem = self.image.get_height()
         
-        # Reduz o rect de colisão para 10% do tamanho da imagem (compensa áreas transparentes)
-        # Isso garante que a área de colisão seja próxima do tamanho visual real da bala
-        # Quanto menor o percentual, mais precisa será a colisão (10% para área extremamente precisa)
-        largura_colisao = max(1, int(largura_imagem * 0.10))
-        altura_colisao = max(1, int(altura_imagem * 0.10))
+        # O rect de colisão deve ter o tamanho exato da imagem
+        # Isso garante que a área de dano seja exatamente do tamanho visual da bala
+        self.rect = pygame.Rect(0, 0, largura_imagem, altura_imagem)
         
-        # Cria rect de colisão menor que a imagem
-        self.rect = pygame.Rect(0, 0, largura_colisao, altura_colisao)
-        
-        # Rect para renderização (tamanho completo da imagem)
+        # Rect para renderização (mesmo tamanho da imagem)
         self.render_rect = pygame.Rect(0, 0, largura_imagem, altura_imagem)
         
         # Posiciona ambos os rects na tela baseado nas coordenadas do mundo
+        # IMPORTANTE: world_y representa o centro Y do cano, então centralizamos o rect nesse ponto
+        # Isso garante que a área de colisão seja exatamente do tamanho da bala, sem se estender abaixo
         pos_x_tela = int(self.world_x - camera_x)
         pos_y_tela = int(self.world_y)
         self.rect.centerx = pos_x_tela
-        self.rect.centery = pos_y_tela
+        self.rect.centery = pos_y_tela  # Centraliza verticalmente no ponto de disparo
         self.render_rect.centerx = pos_x_tela
         self.render_rect.centery = pos_y_tela
         
@@ -1091,11 +1095,11 @@ class ProjetilInimigo(pygame.sprite.Sprite):
         self.world_x += self.direction_x * self.speed
         
         # CRÍTICO: Atualiza a posição na tela baseada na câmera
-        # Atualiza rect de colisão (menor, para área de colisão precisa)
+        # Atualiza rect de colisão (tamanho exato da imagem, sem se estender abaixo)
         pos_x_tela = int(self.world_x - camera_x)
         pos_y_tela = int(self.world_y)
         self.rect.centerx = pos_x_tela
-        self.rect.centery = pos_y_tela
+        self.rect.centery = pos_y_tela  # Centraliza verticalmente, área de colisão exata da bala
         
         # Atualiza rect de renderização (para desenhar a imagem completa)
         self.render_rect.centerx = pos_x_tela
@@ -1395,4 +1399,475 @@ class Coracao(pygame.sprite.Sprite):
         self.float_offset = math.sin(self.animation_timer) * 3  # Flutua 3 pixels para cima/baixo
         # Mantém o bottom no chão (world_y) e aplica a flutuação
         self.rect.bottom = int(self.world_y + self.float_offset)
+
+
+class InimigoFinal(pygame.sprite.Sprite):
+    """Inimigo Final (Boss) - aparece quando o jogador mata 150 inimigos"""
+    def __init__(self, x, y, scale=4.0, idle_count=None):
+        super().__init__()
+        self.scale = float(scale) if scale >= 0.5 else 0.5
+        
+        # Carrega animações do Inimigo Final
+        # Idle.png tem 6 frames (largura 128)
+        if idle_count is None:
+            idle_count = 6  # Idle.png tem exatamente 6 frames
+        self.idle_frames = self._load_frames(homeless3_idle, idle_count, self.scale, frame_width_hint=128)
+        
+        # Run.png tem 8 frames (largura 128)
+        self.run_frames = self._load_frames(homeless3_run, 8, self.scale, frame_width_hint=128)
+        
+        # Attack_1.png tem 5 frames (largura 128)
+        self.attack_frames = self._load_frames(homeless3_attack1, 5, self.scale, frame_width_hint=128)
+        
+        # Special.png tem 13 frames (largura 128)
+        self.special_frames = self._load_frames(homeless3_special, 13, self.scale, frame_width_hint=128)
+        
+        # Dead.png (animação de morte)
+        self.dead_frames = self._load_frames(homeless3_dead, None, self.scale)
+        
+        # Validação: garante que os frames foram carregados corretamente
+        if len(self.idle_frames) == 0:
+            print(f"AVISO: Nenhum frame idle foi carregado para InimigoFinal!")
+            self.idle_frames = [self._superficie_fallback(self.scale)]
+        if len(self.run_frames) == 0:
+            self.run_frames = self.idle_frames.copy()
+        if len(self.attack_frames) == 0:
+            self.attack_frames = self.idle_frames.copy()
+        if len(self.special_frames) == 0:
+            self.special_frames = self.idle_frames.copy()
+        
+        # CRÍTICO: Normaliza TODAS as animações com as MESMAS dimensões máximas
+        todas_animacoes = []
+        if self.idle_frames:
+            todas_animacoes.extend(self.idle_frames)
+        if self.run_frames:
+            todas_animacoes.extend(self.run_frames)
+        if self.attack_frames:
+            todas_animacoes.extend(self.attack_frames)
+        if self.special_frames:
+            todas_animacoes.extend(self.special_frames)
+        if self.dead_frames:
+            todas_animacoes.extend(self.dead_frames)
+        
+        if todas_animacoes:
+            largura_max = max(img.get_width() for img in todas_animacoes)
+            altura_max = max(img.get_height() for img in todas_animacoes)
+            
+            # Redimensiona todas as animações para o mesmo tamanho
+            def normalizar_quadros(quadros):
+                normalizados = []
+                for quadro in quadros:
+                    novo_quadro = pygame.Surface((largura_max, altura_max), pygame.SRCALPHA)
+                    centro_x = (largura_max - quadro.get_width()) // 2
+                    centro_y = (altura_max - quadro.get_height()) // 2
+                    novo_quadro.blit(quadro, (centro_x, centro_y))
+                    normalizados.append(novo_quadro)
+                return normalizados
+            
+            self.idle_frames = normalizar_quadros(self.idle_frames)
+            self.run_frames = normalizar_quadros(self.run_frames)
+            self.attack_frames = normalizar_quadros(self.attack_frames)
+            if self.special_frames:
+                self.special_frames = normalizar_quadros(self.special_frames)
+            if self.dead_frames:
+                self.dead_frames = normalizar_quadros(self.dead_frames)
+        
+        # Estado de animação
+        self.current_frames = self.idle_frames if self.idle_frames else [self._superficie_fallback(self.scale)]
+        self.frame_index = 0
+        self.animation_timer = 0.0
+        self.animation_speed = 0.12
+        self.punch_timer = 0.0  # Timer para animação de soco
+        self.punch_duration = 0.5  # Duração do soco (5 frames a 0.1s cada = 0.5s)
+        
+        # Estado especial (40% de vida)
+        self.special_executado = False  # Flag para garantir que executa apenas uma vez
+        self.is_special = False  # Flag para indicar que está executando a animação special
+        self.special_timer = 0.0  # Timer para controlar a animação special
+        self.special_duration = 0.0  # Duração total da animação special (será calculada)
+        
+        # Movimento e direção
+        # Velocidade reduzida em 20% e depois mais 10%: 7.0 * 0.8 * 0.9 = 5.04 (base), será aumentada em 5% após special
+        self.base_speed = 5.0  # Velocidade reduzida (menor que o Shelby)
+        self.speed = 5.0  # Velocidade reduzida (menor que o Shelby)
+        self.facing = "left"  # Inimigos começam olhando para esquerda por padrão
+        
+        # Estado de morte
+        self.is_dying = False
+        self.dead_timer = 0.0
+        self.dead_last_frame_duration = 2.0  # 2 segundos no último frame
+        self._was_dying = False  # Flag para detectar quando acabou de morrer
+        self.death_animation_finished = False  # Flag para indicar quando a animação de morte terminou
+        
+        # Sistema de soco (similar ao Cyborg)
+        self.punch_cooldown = random.uniform(0.0, 1.5)  # Cooldown inicial aleatório
+        self.punch_interval = 1.5  # Intervalo entre socos
+        self.punch_range = 80.0  # Alcance do soco (em pixels do mundo)
+        self.detection_range = 1000  # Detecta o player de longe
+        
+        # Inicializa a imagem corretamente com flip se necessário
+        quadro_inicial = self.idle_frames[0] if self.idle_frames else self._superficie_fallback(self.scale)
+        quadro_inicial = quadro_inicial.copy()
+        if self.facing == "left":
+            quadro_inicial = pygame.transform.flip(quadro_inicial, True, False)
+        self.image = quadro_inicial
+        self.rect = self.image.get_rect(center=(x, y))
+        
+        # Física vertical
+        self.vel_y = 0.0
+        self.gravidade = 0.65  # Aumentado de 0.45 para 0.65 (aproximadamente 44% mais rápido)
+        self.no_chao = True
+        
+        # Saúde (boss tem 20x mais vida que o personagem)
+        # Personagem tem 10 de vida, então boss tem 200 (dobrado)
+        self.health = 200
+        self.max_health = 200
+        self.alive = True
+        self.health_threshold_special = 0.40  # 40% de vida para ativar special
+        self.previous_health = 200  # Para detectar quando a vida muda
+        
+        # Posição no mundo
+        self.world_x = float(x)
+        self.world_y = float(y)
+    
+    def _superficie_fallback(self, escala=1):
+        superficie = pygame.Surface((32*escala, 48*escala), pygame.SRCALPHA)
+        superficie.fill((255, 0, 255))  # Magenta para destacar
+        return superficie
+    
+    def _detectar_numero_quadros(self, folha, dica_largura_quadro=None):
+        """Detecta automaticamente o número de frames em um sprite sheet"""
+        largura_folha, altura_folha = folha.get_width(), folha.get_height()
+        
+        if dica_largura_quadro:
+            numero_quadros = largura_folha // dica_largura_quadro
+            if numero_quadros > 0 and (numero_quadros * dica_largura_quadro) == largura_folha:
+                return numero_quadros, dica_largura_quadro
+        
+        larguras_comuns = [256, 192, 144, 128, 112, 96, 80, 64, 48, 32]
+        
+        melhor_opcao = None
+        melhor_pontuacao = 0
+        
+        for largura in larguras_comuns:
+            if largura_folha % largura == 0:
+                numero_quadros = largura_folha // largura
+                if numero_quadros > 0:
+                    if 4 <= numero_quadros <= 20:
+                        return numero_quadros, largura
+                    if melhor_opcao is None or (melhor_pontuacao < numero_quadros <= 20):
+                        melhor_opcao = (numero_quadros, largura)
+                        melhor_pontuacao = numero_quadros
+        
+        if melhor_opcao:
+            return melhor_opcao
+        
+        largura = 32
+        while largura <= largura_folha:
+            if largura_folha % largura == 0:
+                numero_quadros = largura_folha // largura
+                if numero_quadros > 0 and numero_quadros <= 30:
+                    return numero_quadros, largura
+            largura *= 2
+        
+        return 1, largura_folha
+    
+    def _load_frames(self, caminho, num_frames=None, scale=1.0, frame_width_hint=None):
+        caminho = os.path.normpath(caminho)
+        try:
+            folha = pygame.image.load(caminho).convert_alpha()
+        except Exception:
+            return [self._superficie_fallback(scale)]
+        
+        largura_folha, altura_folha = folha.get_width(), folha.get_height()
+        
+        if num_frames is None or num_frames <= 0:
+            numero_quadros, largura_quadro = self._detectar_numero_quadros(folha, frame_width_hint)
+        else:
+            numero_quadros = num_frames
+            # Calcula a largura exata de cada frame
+            if largura_folha % numero_quadros == 0:
+                largura_quadro = largura_folha // numero_quadros
+            else:
+                largura_quadro = largura_folha // numero_quadros
+        
+        quadros = []
+        for i in range(numero_quadros):
+            x_inicio = i * largura_quadro
+            if i == numero_quadros - 1:
+                largura_atual = largura_folha - x_inicio
+            else:
+                largura_atual = largura_quadro
+            
+            if x_inicio >= largura_folha or largura_atual <= 0:
+                break
+                
+            rect = pygame.Rect(x_inicio, 0, largura_atual, altura_folha)
+            try:
+                quadro = folha.subsurface(rect).copy()
+                nova_largura = max(1, int(round(quadro.get_width() * scale)))
+                nova_altura = max(1, int(round(quadro.get_height() * scale)))
+                quadro = pygame.transform.scale(quadro, (nova_largura, nova_altura))
+                quadros.append(quadro)
+            except Exception:
+                quadros.append(self._superficie_fallback(scale))
+        
+        return quadros if quadros else [self._superficie_fallback(scale)]
+    
+    def take_damage(self, dano=1):
+        """Inflige dano ao Inimigo Final"""
+        if self.is_dying or not self.alive:
+            return
+        
+        # Salva a vida anterior para detectar mudança
+        self.previous_health = self.health
+        self.health -= dano
+        
+        # Verifica se chegou a 40% de vida e ainda não executou a animação special
+        health_percentage = float(self.health) / float(self.max_health)
+        previous_health_percentage = float(self.previous_health) / float(self.max_health)
+        
+        # Se a vida caiu de acima de 40% para abaixo ou igual a 40%, ativa a animação special
+        if (previous_health_percentage > self.health_threshold_special and 
+            health_percentage <= self.health_threshold_special and 
+            not self.special_executado):
+            # Ativa a animação special
+            self.is_special = True
+            self.special_executado = True
+            self.special_timer = 0.0
+            self.frame_index = 0
+            self.animation_timer = 0.0
+            # Calcula a duração da animação special (13 frames * 0.12 segundos por frame)
+            if self.special_frames:
+                self.special_duration = len(self.special_frames) * 0.12
+            else:
+                self.special_duration = 1.5  # Duração padrão se não houver frames
+            print(f"Inimigo Final ativou modo especial! Vida: {self.health}/{self.max_health} ({health_percentage*100:.1f}%)")
+        
+        if self.health <= 0:
+            self.is_dying = True
+            self.alive = False
+            self.frame_index = 0
+            self.animation_timer = 0.0
+            self.dead_timer = 0.0
+            self._was_dying = False
+            self.death_animation_finished = False  # Reseta flag quando começa a morrer
+    
+    def calcular_distancia(self, alvo_x, alvo_y):
+        """Calcula a distância até o alvo"""
+        delta_x = alvo_x - self.world_x
+        delta_y = alvo_y - self.world_y
+        return math.sqrt(delta_x * delta_x + delta_y * delta_y)
+    
+    def atualizar_direcao(self, alvo_mundo_x, camera_x=0):
+        """Atualiza a direção visual do Inimigo Final"""
+        alvo_tela_x = alvo_mundo_x - camera_x
+        centro_x_tela_inimigo = int(self.world_x - camera_x)
+
+        if alvo_tela_x > centro_x_tela_inimigo:
+            self.facing = "right"
+        elif alvo_tela_x < centro_x_tela_inimigo:
+            self.facing = "left"
+    
+    def pode_socar(self, alvo_x, alvo_y):
+        """Verifica se o Inimigo Final pode socar o alvo"""
+        # Não pode socar durante a animação special
+        if self.is_special:
+            return False
+        distancia = self.calcular_distancia(alvo_x, alvo_y)
+        return (distancia <= self.punch_range and 
+                self.punch_cooldown <= 0.0 and 
+                self.punch_timer <= 0.0)
+    
+    def socar(self, alvo_x, alvo_y):
+        """Executa um soco no alvo (ataque corpo-a-corpo, similar ao Cyborg)"""
+        if not self.alive or not self.pode_socar(alvo_x, alvo_y):
+            return False
+        
+        self.punch_timer = self.punch_duration
+        self.punch_cooldown = self.punch_interval
+        # Reseta a animação de ataque para o primeiro frame
+        self.frame_index = 0
+        self.animation_timer = 0.0
+        return True
+    
+    def update(self, delta_tempo, camera_x, protagonista_pos=None):
+        """Atualiza o Inimigo Final"""
+        # Se está morrendo, mostra animação de morte
+        if self.is_dying:
+            if self.dead_frames and len(self.dead_frames) > 0:
+                # Atualiza animação de morte
+                self.dead_timer += delta_tempo
+                tempo_por_frame = 0.1  # Velocidade da animação de morte
+                if self.dead_timer >= tempo_por_frame:
+                    self.dead_timer = 0.0
+                    self.frame_index += 1
+                    if self.frame_index >= len(self.dead_frames):
+                        # Último frame: mantém por mais tempo
+                        self.frame_index = len(self.dead_frames) - 1
+                        if not self._was_dying:
+                            self._was_dying = True
+                            self.dead_timer = 0.0
+                        elif self.dead_timer >= self.dead_last_frame_duration:
+                            # Marca que a animação de morte terminou antes de remover o sprite
+                            self.death_animation_finished = True
+                            self.kill()
+                            return
+                
+                # Atualiza frame de morte
+                quadro = self.dead_frames[min(self.frame_index, len(self.dead_frames) - 1)].copy()
+                if self.facing == "left":
+                    quadro = pygame.transform.flip(quadro, True, False)
+                self.image = quadro
+                
+                # Calcula a posição na tela
+                centro_x_tela = int(self.world_x - camera_x)
+                self.rect = self.image.get_rect()
+                self.rect.centerx = centro_x_tela
+                self.rect.bottom = int(self.world_y)
+            else:
+                # Sem animação de morte, marca como terminada e remove
+                self.death_animation_finished = True
+                self.kill()
+            return
+        
+        if not self.alive:
+            return
+        
+        # Se está executando a animação special, executa apenas ela
+        if self.is_special:
+            self.special_timer += delta_tempo
+            
+            # Verifica se a animação terminou
+            if self.special_timer >= self.special_duration:
+                # Animação special terminou - aumenta estatísticas
+                # Aumenta velocidade em 5%
+                self.speed = self.base_speed  # Mantém a mesma velocidade (7.0, igual ao Shelby)
+                # Desativa modo special
+                self.is_special = False
+                self.frame_index = 0
+                self.animation_timer = 0.0
+                print(f"Inimigo Final aumentou poder! Velocidade: {self.speed:.2f}")
+                # Continua para o comportamento normal após a animação
+            else:
+                # Atualiza animação special
+                velocidade_animacao_special = 0.12  # Velocidade da animação special
+                self.animation_timer += delta_tempo
+                if self.animation_timer >= velocidade_animacao_special:
+                    self.animation_timer = 0.0
+                    self.frame_index += 1
+                    if self.frame_index >= len(self.special_frames):
+                        # Mantém no último frame até a duração total terminar
+                        self.frame_index = len(self.special_frames) - 1
+                
+                # Mostra frame atual da animação special
+                quadro = self.special_frames[min(self.frame_index, len(self.special_frames) - 1)].copy()
+                if self.facing == "left":
+                    quadro = pygame.transform.flip(quadro, True, False)
+                self.image = quadro
+                
+                # Calcula a posição na tela
+                centro_x_tela = int(self.world_x - camera_x)
+                self.rect = self.image.get_rect()
+                self.rect.centerx = centro_x_tela
+                self.rect.bottom = int(self.world_y)
+                
+                # Durante a animação special, não move nem ataca
+                return
+        
+        # Atualiza cooldowns
+        if self.punch_cooldown > 0:
+            self.punch_cooldown -= delta_tempo
+        if self.punch_timer > 0:
+            self.punch_timer -= delta_tempo
+        
+        # Comportamento: persegue o jogador e soca quando dentro do alcance (igual ao Cyborg)
+        movendo = False
+        if protagonista_pos:
+            alvo_x, alvo_y = protagonista_pos
+            distancia = self.calcular_distancia(alvo_x, alvo_y)
+            
+            # Sempre atualiza a direção para olhar para o protagonista
+            self.atualizar_direcao(alvo_x, camera_x)
+            
+            # Se está socando, não se move
+            if self.punch_timer > 0:
+                movendo = False
+            # Persegue o player quando detecta
+            elif distancia <= self.detection_range:
+                # Verifica se está na mesma posição X do player (em cima do player)
+                distancia_x = abs(alvo_x - self.world_x)
+                esta_acima_jogador = distancia_x <= 30  # Tolerância de 30 pixels
+                
+                # Se está em cima do player, anda para a direita
+                if esta_acima_jogador:
+                    movendo = True
+                    self.world_x += self.speed
+                elif distancia > self.punch_range:
+                    # Persegue o player
+                    movendo = True
+                    if alvo_x < self.world_x:
+                        self.world_x -= self.speed
+                    else:
+                        self.world_x += self.speed
+                elif self.pode_socar(alvo_x, alvo_y):
+                    # Está perto o suficiente, soca (e para de se mover)
+                    self.socar(alvo_x, alvo_y)
+                    movendo = False
+        
+        # Determina o estado da animação baseado no comportamento
+        if self.punch_timer > 0:
+            estado_atual = "attack"
+        elif movendo:
+            estado_atual = "run"
+        else:
+            estado_atual = "idle"
+        
+        # Seleciona animação baseada no estado (prioriza ataque se está socando)
+        if self.punch_timer > 0 and self.attack_frames:
+            # Está socando - usa animação de ataque
+            quadros = self.attack_frames
+            velocidade_animacao = 0.1  # Animação de ataque (5 frames a 0.1s cada = 0.5s total)
+        elif estado_atual == "run" and self.run_frames:
+            quadros = self.run_frames
+            velocidade_animacao = 0.1  # Animação de corrida mais rápida
+        elif estado_atual == "attack" and self.attack_frames:
+            quadros = self.attack_frames
+            velocidade_animacao = 0.1  # Animação de ataque
+        else:
+            quadros = self.idle_frames
+            velocidade_animacao = self.animation_speed
+        
+        # Atualiza animação
+        self.animation_timer += delta_tempo
+        if self.animation_timer >= velocidade_animacao:
+            self.animation_timer = 0.0
+            # Se está socando, avança frame mas não loopa (mostra os 5 frames)
+            if self.punch_timer > 0:
+                if self.frame_index < len(quadros) - 1:
+                    self.frame_index += 1
+                else:
+                    # Mantém no último frame enquanto está socando
+                    self.frame_index = len(quadros) - 1
+            else:
+                # Outras animações fazem loop
+                self.frame_index = (self.frame_index + 1) % len(quadros)
+        
+        # Atualiza frame
+        quadro = quadros[self.frame_index].copy()
+        if self.facing == "left":
+            quadro = pygame.transform.flip(quadro, True, False)
+        
+        self.image = quadro
+        
+        # CRÍTICO: Atualiza a posição na tela baseada em world_x e world_y
+        # Isso garante que o movimento horizontal seja visível
+        # Calcula a posição na tela ANTES de recriar o rect
+        centro_x_tela = int(self.world_x - camera_x)
+        bottom_y = int(self.world_y)
+        
+        # Recria o rect com a nova imagem e atualiza a posição
+        self.rect = self.image.get_rect()
+        self.rect.centerx = centro_x_tela
+        self.rect.bottom = bottom_y
 

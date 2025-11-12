@@ -37,6 +37,19 @@ cyborg_attack2 = os.path.join(base_cyborg, "Cyborg_attack2.png")
 cyborg_attack3 = os.path.join(base_cyborg, "Cyborg_attack3.png")
 cyborg_death = os.path.join(base_cyborg, "Cyborg_death.png")
 
+#vilão final (homeless 3)
+base_homeless3 = os.path.normpath("assets/Imagens/Homeless_3")
+homeless3_idle = os.path.join(base_homeless3, "Idle.png")
+homeless3_idle2 = os.path.join(base_homeless3, "Idle_2.png")
+homeless3_run = os.path.join(base_homeless3, "Run.png")
+homeless3_walk = os.path.join(base_homeless3, "Walk.png")
+homeless3_jump = os.path.join(base_homeless3, "Jump.png")
+homeless3_attack1 = os.path.join(base_homeless3, "Attack_1.png")
+homeless3_attack2 = os.path.join(base_homeless3, "Attack_2.png")
+homeless3_special = os.path.join(base_homeless3, "Special.png")
+homeless3_hurt = os.path.join(base_homeless3, "Hurt.png")
+homeless3_dead = os.path.join(base_homeless3, "Dead.png")
+
 #efeitos de fogo
 base_fire = os.path.normpath("assets/Imagens/pack_effect_fire_column/fire_column_medium")
 fire_frames_paths = [

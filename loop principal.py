@@ -11,8 +11,10 @@ pygame.init()
 pygame.mixer.init()  # Inicializa o mixer de áudio
 
 # --- Configurações da tela ---
-LARGURA_TELA, ALTURA_TELA = 800, 600
-tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA))
+# Obtém o tamanho da tela para modo fullscreen
+info_tela = pygame.display.Info()
+LARGURA_TELA, ALTURA_TELA = info_tela.current_w, info_tela.current_h
+tela = pygame.display.set_mode((LARGURA_TELA, ALTURA_TELA), pygame.FULLSCREEN)
 pygame.display.set_caption("THOMAS VELOZES & SHELBYS FURIOSOS")
 relogio = pygame.time.Clock()
 FPS = 60
@@ -270,10 +272,20 @@ camadas_fundo = carregar_camadas(ALTURA_TELA)
 camera_x = 0.0
 
 # --- Altura do chão visual (personagem pisa sobre o cenário) ---
-CHAO_Y = 550   
+# Calcula dinamicamente baseado na altura da tela (mantém proporção de ~91.67% da altura)
+CHAO_Y = int(ALTURA_TELA * 0.9167)   
+
+# --- Fator de escala global para personagens e obstáculos ---
+# Baseado na altura da tela (altura original era 600)
+ALTURA_ORIGINAL = 600
+ESCALA_GLOBAL = ALTURA_TELA / ALTURA_ORIGINAL
 
 # --- Jogador ---
-jogador = Protagonista(LARGURA_TELA // 2, ALTURA_TELA - 150, scale=1.5,
+# Posição inicial do jogador: centro X e 150 pixels acima do chão (proporcional)
+offset_y_jogador = int(150 * ESCALA_GLOBAL)
+posicao_y_jogador = CHAO_Y - offset_y_jogador
+scale_jogador = 1.5 * ESCALA_GLOBAL
+jogador = Protagonista(LARGURA_TELA // 2, posicao_y_jogador, scale=scale_jogador,
                       idle_count=6, run_count=10, jump_count=10, double_count=10)
 
 grupo_jogador = pygame.sprite.Group(jogador)
@@ -351,7 +363,8 @@ def desenhar_coracoes_vida(tela, jogador, x=20, y=20, tamanho_coracao=30):
     # Total de corações: 5 (cada um vale 2 vidas)
     total_coracoes = 5
     coracoes_por_linha = 5
-    espacamento = 5  # Espaçamento entre corações
+    # Espaçamento proporcional ao tamanho do coração (mantém proporção)
+    espacamento = max(1, int(tamanho_coracao / 6))  # Espaçamento entre corações (proporcional)
     
     # Calcula quantos corações cheios e meio corações
     vida = jogador.health
@@ -409,8 +422,11 @@ def reiniciar_jogo():
     # Reseta câmera
     camera_x = 0.0
     
-    # Recria o jogador
-    jogador = Protagonista(LARGURA_TELA // 2, ALTURA_TELA - 150, scale=1.5,
+    # Recria o jogador (usa mesma posição inicial proporcional)
+    offset_y_jogador = int(150 * ESCALA_GLOBAL)
+    posicao_y_jogador = CHAO_Y - offset_y_jogador
+    scale_jogador = 1.5 * ESCALA_GLOBAL
+    jogador = Protagonista(LARGURA_TELA // 2, posicao_y_jogador, scale=scale_jogador,
                           idle_count=6, run_count=10, jump_count=10, double_count=10)
     grupo_jogador = pygame.sprite.Group(jogador)
     
@@ -837,9 +853,9 @@ while rodando:
                 plataforma_escolhida = None
                 
                 if tipo_inimigo == "careca":
-                    novo_inimigo = spawn_careca(posicao_x_spawn, posicao_y_spawn, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado=lado)
+                    novo_inimigo = spawn_careca(posicao_x_spawn, posicao_y_spawn, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado=lado, escala_global=ESCALA_GLOBAL)
                 else:
-                    novo_inimigo = spawn_inimigo_cyborg(posicao_x_spawn, posicao_y_spawn, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado=lado)
+                    novo_inimigo = spawn_inimigo_cyborg(posicao_x_spawn, posicao_y_spawn, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado=lado, escala_global=ESCALA_GLOBAL)
                 
                 # Ajusta a posição Y do inimigo se estiver em uma plataforma
                 if spawnar_em_plataforma and plataforma_escolhida:
@@ -857,17 +873,18 @@ while rodando:
                 posicao_x_fogo = camera_x + LARGURA_TELA + random.randint(200, 400)
                 # A coluna será posicionada no chão (o rect.bottom será ajustado no update)
                 posicao_y_fogo = CHAO_Y
-                coluna_fogo = ColunaFogo(posicao_x_fogo, posicao_y_fogo, scale=3.0)  # Aumentado para 3.0
+                scale_coluna_fogo = 3.0 * ESCALA_GLOBAL
+                coluna_fogo = ColunaFogo(posicao_x_fogo, posicao_y_fogo, scale=scale_coluna_fogo)
                 # Ajusta o bottom da coluna para ficar no chão
                 coluna_fogo.rect.bottom = CHAO_Y
                 coluna_fogo.world_y = CHAO_Y
                 colunas_fogo.add(coluna_fogo)
                 
                 # Spawna plataforma antes da coluna de fogo
-                largura_plataforma = 200
-                altura_plataforma = 20
-                posicao_x_plataforma = posicao_x_fogo - largura_plataforma - 50  # 50 pixels antes da coluna
-                posicao_y_plataforma = CHAO_Y - 150  # 150 pixels acima do chão
+                largura_plataforma = int(200 * ESCALA_GLOBAL)
+                altura_plataforma = int(20 * ESCALA_GLOBAL)
+                posicao_x_plataforma = posicao_x_fogo - largura_plataforma - int(50 * ESCALA_GLOBAL)  # Escalado antes da coluna
+                posicao_y_plataforma = CHAO_Y - int(150 * ESCALA_GLOBAL)  # Escalado acima do chão
                 plataforma = Plataforma(posicao_x_plataforma, posicao_y_plataforma, largura_plataforma, altura_plataforma, plataformas)
                 plataformas.add(plataforma)
                 
@@ -885,9 +902,9 @@ while rodando:
                     # Escolhe tipo de inimigo aleatoriamente
                     tipo_inimigo = random.choice(["cyborg", "careca"])
                     if tipo_inimigo == "careca":
-                        novo_inimigo = spawn_careca(posicao_x_inimigo, posicao_y_inimigo, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado="direita")
+                        novo_inimigo = spawn_careca(posicao_x_inimigo, posicao_y_inimigo, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado="direita", escala_global=ESCALA_GLOBAL)
                     else:
-                        novo_inimigo = spawn_inimigo_cyborg(posicao_x_inimigo, posicao_y_inimigo, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado="direita")
+                        novo_inimigo = spawn_inimigo_cyborg(posicao_x_inimigo, posicao_y_inimigo, LARGURA_TELA, jogador.rect.centery, x_offset=0, lado="direita", escala_global=ESCALA_GLOBAL)
                     
                     # Ajusta a posição Y para ficar no topo da plataforma
                     novo_inimigo.rect.bottom = posicao_y_plataforma
@@ -903,7 +920,8 @@ while rodando:
                     temporizador_spawn_coracao = 0.0
                     # Spawna coração mais longe do jogador (no chão) - à frente da tela visível
                     posicao_x_coracao = camera_x + random.randint(LARGURA_TELA + 200, LARGURA_TELA * 2)  # Spawna longe, à frente do jogador
-                    coracao = Coracao(posicao_x_coracao, CHAO_Y, escala=1.0)  # Tamanho fixo de 30x30 pixels
+                    escala_coracao = 1.0 * ESCALA_GLOBAL
+                    coracao = Coracao(posicao_x_coracao, CHAO_Y, escala=escala_coracao)
                     # Ajusta o bottom do coração para ficar no chão
                     coracao.world_y = CHAO_Y
                     # Atualiza a posição baseada na câmera (o update vai ajustar o rect)
@@ -974,7 +992,10 @@ while rodando:
             tela.blit(coracao.image, coracao.rect)
     
     # Desenha corações de vida por último para ficar sempre visível
-    desenhar_coracoes_vida(tela, jogador, x=20, y=20, tamanho_coracao=30)
+    tamanho_coracao_vida = int(30 * ESCALA_GLOBAL)
+    pos_x_coracao_vida = int(20 * ESCALA_GLOBAL)
+    pos_y_coracao_vida = int(20 * ESCALA_GLOBAL)
+    desenhar_coracoes_vida(tela, jogador, x=pos_x_coracao_vida, y=pos_y_coracao_vida, tamanho_coracao=tamanho_coracao_vida)
     
     # --- Desenha mensagens de Game Over ---
     if game_over:

@@ -37,8 +37,8 @@ class Protagonista(pygame.sprite.Sprite):
 
         self.vel_y = 0.0
         self.gravidade = 0.45        
-        self.jump_force = -10.0      
-        self.double_jump_force = -8.0
+        self.jump_force = -12.0      # Aumentado mais para melhor alcance nas plataformas
+        self.double_jump_force = -10.0  # Aumentado proporcionalmente
         self.no_chao = True
         self.can_double_jump = True
         self.used_double = False
@@ -295,16 +295,20 @@ class Protagonista(pygame.sprite.Sprite):
         
         self.shot_timer = self.shot_duration
 
-        # ponto de origem aproximado do cano da arma
+        # ponto de origem do cano da arma (ajustado para ficar na ponta da arma)
         imagem = self.image
+        # Ajusta a posição X para ficar mais na ponta da arma (aproximadamente 1/3 da largura do sprite)
+        offset_x_arma = imagem.get_width() // 3
         if self.facing == "right":
-            posicao_x_cano = self.rect.centerx + imagem.get_width() // 8
+            posicao_x_cano = self.rect.centerx + offset_x_arma
         else:
-            posicao_x_cano = self.rect.centerx - imagem.get_width() // 8
-        # altura do projétil acompanha a posição Y atual do personagem (arma fica aproximadamente no centery)
-        posicao_y_cano = (self.rect.centery - imagem.get_height() // 10)+53
+            posicao_x_cano = self.rect.centerx - offset_x_arma
+        # altura do projétil: abaixo do centro Y do personagem (onde a arma normalmente está)
+        # Adiciona offset positivo para descer a bala alguns pixels
+        offset_y_arma = int(imagem.get_height() * 0.22)  # 22% da altura do sprite para baixo
+        posicao_y_cano = self.rect.centery + offset_y_arma
         direcao = 1 if self.facing == "right" else -1
-        velocidade = 12
+        velocidade = 20  # Aumentada de 12 para 20 para balas mais rápidas
         return Projetil(posicao_x_cano, posicao_y_cano, direcao, velocidade, self.scale)
 
 

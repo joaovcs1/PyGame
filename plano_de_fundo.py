@@ -10,7 +10,9 @@ def carregar_camadas(screen_height):
         try:
             img = pygame.image.load(caminho).convert_alpha()
         except Exception:
-            img = pygame.Surface((800, 600), pygame.SRCALPHA)
+            # Usa a altura da tela para criar fallback proporcional
+            largura_fallback = int(screen_height * (4/3))  # Mantém proporção 4:3
+            img = pygame.Surface((largura_fallback, screen_height), pygame.SRCALPHA)
             img.fill((30, 30, 30))
 
         # escala proporcional pela altura da tela

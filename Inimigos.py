@@ -389,7 +389,7 @@ class InimigoCyborg(pygame.sprite.Sprite):
         self.rect.centerx = centro_x_tela
 
 
-def spawn_inimigo_cyborg(camera_x, chao_y, screen_width, player_y, x_offset=0, lado="direita"):
+def spawn_inimigo_cyborg(camera_x, chao_y, screen_width, player_y, x_offset=0, lado="direita", escala_global=1.0):
     """
     Spawna um Cyborg em uma posição relativa à câmera
     
@@ -400,6 +400,7 @@ def spawn_inimigo_cyborg(camera_x, chao_y, screen_width, player_y, x_offset=0, l
         player_y: Altura Y do player (para spawnar na mesma altura)
         x_offset: Offset em relação à câmera (0 = próximo à câmera, positivo = mais à frente/atrás)
         lado: "direita" para spawnar à direita, "esquerda" para spawnar à esquerda
+        escala_global: Fator de escala global para ajustar o tamanho (padrão 1.0)
     
     Returns:
         InimigoCyborg ou None
@@ -418,8 +419,9 @@ def spawn_inimigo_cyborg(camera_x, chao_y, screen_width, player_y, x_offset=0, l
             posicao_x_spawn = camera_x + screen_width + x_offset
     
     # None = detecta automaticamente o número de frames
-    # Scale 3.2 para tornar o Cyborg maior
-    return InimigoCyborg(posicao_x_spawn, posicao_y_spawn, scale=3.2, idle_count=None, run_count=None, punch_count=None)
+    # Scale 3.2 * escala_global para tornar o Cyborg maior proporcionalmente
+    scale_cyborg = 3.2 * escala_global
+    return InimigoCyborg(posicao_x_spawn, posicao_y_spawn, scale=scale_cyborg, idle_count=None, run_count=None, punch_count=None)
 
 
 class Careca(pygame.sprite.Sprite):
@@ -821,9 +823,19 @@ class Careca(pygame.sprite.Sprite):
         if hasattr(self, 'rect') and self.rect is not None:
             base_anterior = self.rect.bottom
         else:
-            # Se não tem rect ainda (primeira vez), usa uma posição padrão
+            # Se não tem rect ainda (primeira vez), usa uma posição padrão calculada dinamicamente
             # O rect foi criado no __init__ com center=(x, y), então o bottom está definido
-            base_anterior = self.rect.bottom if hasattr(self, 'rect') else 550  # CHAO_Y padrão
+            # Calcula CHAO_Y dinamicamente baseado na altura da tela (~91.67% da altura)
+            try:
+                screen = pygame.display.get_surface()
+                if screen:
+                    screen_height = screen.get_height()
+                    chao_y_dinamico = int(screen_height * 0.9167)
+                else:
+                    chao_y_dinamico = 550  # Fallback se não conseguir obter a tela
+            except:
+                chao_y_dinamico = 550  # Fallback em caso de erro
+            base_anterior = self.rect.bottom if hasattr(self, 'rect') else chao_y_dinamico
         
         # Como sempre usamos shot_frames, não há mudança de animação
         # Mas verificamos se os quadros mudaram (não deveria acontecer, mas por segurança)
@@ -962,8 +974,18 @@ class Careca(pygame.sprite.Sprite):
             # Fallback: usa a posição atual do rect
             base_anterior = self.rect.bottom
         else:
-            # Se não tem rect, usa uma posição padrão
-            base_anterior = 550  # CHAO_Y padrão
+            # Se não tem rect, usa uma posição padrão calculada dinamicamente
+            # Calcula CHAO_Y dinamicamente baseado na altura da tela (~91.67% da altura)
+            try:
+                screen = pygame.display.get_surface()
+                if screen:
+                    screen_height = screen.get_height()
+                    chao_y_dinamico = int(screen_height * 0.9167)
+                else:
+                    chao_y_dinamico = 550  # Fallback se não conseguir obter a tela
+            except:
+                chao_y_dinamico = 550  # Fallback em caso de erro
+            base_anterior = chao_y_dinamico
         
         total_quadros = len(self.dead_frames)
         indice_ultimo_quadro = total_quadros - 1
@@ -1081,12 +1103,26 @@ class ProjetilInimigo(pygame.sprite.Sprite):
         
         # Remove projéteis que saem da tela
         # Usa world_x para verificar se saiu do mundo visível
-        if (self.world_x < camera_x - 200 or self.world_x > camera_x + 1000 or
-            self.rect.bottom < -100 or self.rect.top > 700):
+        # Calcula limites da tela dinamicamente
+        try:
+            screen = pygame.display.get_surface()
+            if screen:
+                screen_height = screen.get_height()
+                screen_width = screen.get_width()
+                limite_superior_tela = screen_height + 100  # Margem de 100px abaixo da tela
+            else:
+                limite_superior_tela = 700  # Fallback
+                screen_width = 1000
+        except:
+            limite_superior_tela = 700  # Fallback
+            screen_width = 1000
+        
+        if (self.world_x < camera_x - 200 or self.world_x > camera_x + screen_width + 200 or
+            self.rect.bottom < -100 or self.rect.top > limite_superior_tela):
             self.kill()
 
 
-def spawn_careca(camera_x, chao_y, screen_width, player_y, x_offset=0, lado="direita"):
+def spawn_careca(camera_x, chao_y, screen_width, player_y, x_offset=0, lado="direita", escala_global=1.0):
     """
     Spawna um Careca em uma posição relativa à câmera
     
@@ -1097,6 +1133,7 @@ def spawn_careca(camera_x, chao_y, screen_width, player_y, x_offset=0, lado="dir
         player_y: Altura Y do player (para spawnar na mesma altura)
         x_offset: Offset em relação à câmera (0 = próximo à câmera, positivo = mais à frente/atrás)
         lado: "direita" para spawnar à direita, "esquerda" para spawnar à esquerda
+        escala_global: Fator de escala global para ajustar o tamanho (padrão 1.0)
     
     Returns:
         Careca ou None
@@ -1115,8 +1152,9 @@ def spawn_careca(camera_x, chao_y, screen_width, player_y, x_offset=0, lado="dir
             posicao_x_spawn = camera_x + screen_width + x_offset
     
     # None = detecta automaticamente o número de frames
-    # Scale 1.5 para tornar o Careca menor
-    return Careca(posicao_x_spawn, posicao_y_spawn, scale=1.5, idle_count=None, shot_count=None)
+    # Scale 1.5 * escala_global para tornar o Careca proporcional
+    scale_careca = 1.5 * escala_global
+    return Careca(posicao_x_spawn, posicao_y_spawn, scale=scale_careca, idle_count=None, shot_count=None)
 
 
 class ColunaFogo(pygame.sprite.Sprite):
@@ -1320,8 +1358,8 @@ class Coracao(pygame.sprite.Sprite):
     def __init__(self, x, y, escala=1.0):
         super().__init__()
         
-        # Tamanho fixo de 30x30 pixels
-        tamanho_alvo = 30
+        # Tamanho base de 30x30 pixels, multiplicado pela escala
+        tamanho_alvo = int(30 * escala)
         
         # Carrega a imagem do coração
         try:

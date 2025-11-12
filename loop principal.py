@@ -71,7 +71,7 @@ except Exception as e:
 
 # Variáveis para controle de sequência de música
 contador_cyberpunk = 0  # Conta quantas vezes cyberpunk-street.mp3 foi tocada
-estado_musica = "cyberpunk"  # Estados: "cyberpunk", "som2", "som3", "som4"
+estado_musica = "cyberpunk"  # Estados: "cyberpunk", "som2", "som3" (som4 toca apenas quando o jogador morre)
 
 # Sons de efeito (usam pygame.mixer.Sound)
 try:
@@ -443,8 +443,9 @@ while rodando:
 
     # --- Controle de sequência de música ---
     # Verifica se a música atual terminou e alterna para a próxima
-    # Sequência: cyberpunk-street.mp3 (2x) → som2.mp3 (1x) → som3.mp3 (1x) → som4.mp3 (1x) → repete
-    if not pygame.mixer.music.get_busy():
+    # Sequência: cyberpunk-street.mp3 (2x) → som2.mp3 (1x) → som3.mp3 (1x) → repete
+    # (som4.mp3 toca apenas quando o jogador morre)
+    if not pygame.mixer.music.get_busy() and not game_over:
         if estado_musica == "cyberpunk":
             # Estava tocando cyberpunk-street.mp3
             if contador_cyberpunk < 2:
@@ -473,17 +474,8 @@ while rodando:
                     estado_musica = "som3"
                 except Exception as e:
                     print(f"Erro ao tocar som3.mp3: {e}")
-        elif estado_musica == "som3":
-            # Estava tocando som3.mp3, agora toca som4.mp3
-            if musica_fundo4_carregada:
-                try:
-                    pygame.mixer.music.load(caminho_musica_fundo4)
-                    pygame.mixer.music.play(0)  # Toca uma vez
-                    estado_musica = "som4"
-                except Exception as e:
-                    print(f"Erro ao tocar som4.mp3: {e}")
-        else:  # estado_musica == "som4"
-            # Estava tocando som4.mp3, agora volta para cyberpunk-street.mp3 (reinicia sequência)
+        else:  # estado_musica == "som3"
+            # Estava tocando som3.mp3, agora volta para cyberpunk-street.mp3 (reinicia sequência)
             if musica_fundo_carregada:
                 try:
                     pygame.mixer.music.load(caminho_musica_fundo)
@@ -551,12 +543,16 @@ while rodando:
     if jogador.is_dying and jogador_morreu_nao_detectado:
         # Jogador acabou de morrer - salva no histórico e inicia game over
         salvar_jogador_atual()
-        # Para a música de fundo quando o jogador morre
+        # Para a música de fundo atual e toca som4.mp3 quando o jogador morre
         if musica_fundo_carregada or musica_fundo2_carregada or musica_fundo3_carregada or musica_fundo4_carregada:
             try:
                 pygame.mixer.music.stop()
+                # Toca som4.mp3 quando o jogador morre
+                if musica_fundo4_carregada:
+                    pygame.mixer.music.load(caminho_musica_fundo4)
+                    pygame.mixer.music.play(0)  # Toca uma vez
             except Exception as e:
-                print(f"Erro ao parar música de fundo: {e}")
+                print(f"Erro ao parar/tocar música de fundo: {e}")
         game_over = True
         game_over_timer = 0.0
         mostrando_popup = False

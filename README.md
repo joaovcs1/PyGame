@@ -100,7 +100,7 @@ Pressione "Alt" + "Esc"
 
     Link do vídeo jogando:
 
-
+https://youtu.be/7VWJ_XcBcu8?si=V1WP27zsoJ9oqVKK
 
 Observação: Para que o vídeo não ficasse muito extenso, alteramos para que o chefão apareça após matar 10 inimigos.
 
